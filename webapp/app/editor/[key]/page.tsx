@@ -9,7 +9,7 @@ import AppSidebar from "@/components/Sidebar";
 import Toolbar from "@/components/Toolbar";
 import { useTextures } from "@/lib/TextureContext";
 import { toast } from "sonner";
-import { exportCanvasPng } from "@/lib/exportCanvasPng";
+import { exportWidgetPng } from "@/lib/exportWidgetPng";
 import TexturePickerModal from "@/components/TexturePickerModal";
 import type { ScreenSpec, WidgetSpec } from "@/lib/types";
 import { generateJavaClass } from "@/lib/generateJavaClass";
@@ -604,28 +604,33 @@ export default function EditorPage() {
   }, [projectKey, screens]);
 
   const handleExportPng = useCallback(async () => {
-    const canvas = canvasWrapperRef.current?.querySelector<HTMLElement>("[data-canvas]");
-    if (!canvas) {
-      toast.error("Could not find the screen canvas to export.");
+    if (!selectedWidget) {
+      toast.error("Select a widget to export as PNG.");
+      return;
+    }
+    const widgetElement = [...(canvasWrapperRef.current?.querySelectorAll<HTMLElement>("[data-widget-id]") ?? [])]
+      .find((element) => element.dataset.widgetId === selectedWidget.id);
+    if (!widgetElement) {
+      toast.error(`Could not find widget ${selectedWidget.id} to export.`);
       return;
     }
 
     setExportingPng(true);
     try {
-      const blob = await exportCanvasPng(canvas, screen.width, screen.height);
+      const blob = await exportWidgetPng(widgetElement, selectedWidget.w, selectedWidget.h);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${screen.id}.png`;
+      link.download = `${selectedWidget.id}.png`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast.success(`Exported ${screen.id}.png (${screen.width} × ${screen.height}px)`);
+      toast.success(`Exported ${selectedWidget.id}.png (${selectedWidget.w} × ${selectedWidget.h}px)`);
     } catch (error) {
       toast.error(`Could not export PNG: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setExportingPng(false);
     }
-  }, [screen.id, screen.width, screen.height]);
+  }, [selectedWidget]);
 
   const handleImportProjectClick = () => importProjectRef.current?.click();
   const handleImportProjectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -713,6 +718,7 @@ export default function EditorPage() {
         <div className="flex flex-1 flex-col overflow-hidden h-svh">
           <Toolbar
             screen={screen}
+            selectedWidget={selectedWidget}
             gridSize={gridSize}
             showGrid={showGrid}
             snapToParent={snapToParent}

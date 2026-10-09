@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuSep
 
 interface Props {
   screen: ScreenSpec;
+  selectedWidget: ScreenSpec["widgets"][number] | null;
   gridSize: number;
   showGrid: boolean;
   snapToParent: boolean;
@@ -49,7 +50,7 @@ interface Props {
 }
 
 export default function Toolbar({
-  screen, gridSize, showGrid, snapToParent, snapToSiblings, canUndo, canRedo, tryMode,
+  screen, selectedWidget, gridSize, showGrid, snapToParent, snapToSiblings, canUndo, canRedo, tryMode,
   onUndo, onRedo, onGridSizeChange, onToggleGrid, onToggleSnapToParent, onToggleSnapToSiblings, onToggleTryMode,
   onScreenChange, onExportProject, onImportProject, onCopyJava, onResetTextures, onViewTextures, onExtractPack,
   onExportPng, exportingPng,
@@ -164,7 +165,7 @@ export default function Toolbar({
         <Button variant="ghost" size="sm" className="h-8 w-8 px-0" onClick={onExportProject} title="Export project (all screens)">
           <FolderDown className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="sm" className="h-8 w-8 px-0" onClick={onExportPng} disabled={exportingPng} title="Export active screen as PNG" aria-label="Export active screen as PNG">
+        <Button variant="ghost" size="sm" className="h-8 w-8 px-0" onClick={onExportPng} disabled={exportingPng || !selectedWidget} title={selectedWidget ? `Export ${selectedWidget.id} as PNG` : "Select a widget to export as PNG"} aria-label="Export selected widget as PNG">
           <Image className="h-4 w-4" />
         </Button>
         <Separator orientation="vertical" className="h-5" />
