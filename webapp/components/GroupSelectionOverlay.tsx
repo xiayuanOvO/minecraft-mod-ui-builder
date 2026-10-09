@@ -27,7 +27,7 @@ export function GroupSelectionOverlay({ widgets, selectedIds, groupDrag }: {
   const right = Math.max(...members.map(w => pos(w).x + w.w));
   const bottom = Math.max(...members.map(w => pos(w).y + w.h));
   return (
-    <div style={{
+    <div data-export-ignore style={{
       position: "absolute",
       left, top,
       width: right - left,

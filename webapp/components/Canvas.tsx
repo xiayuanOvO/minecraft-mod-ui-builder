@@ -474,7 +474,7 @@ export default function Canvas({
             backgroundImage: `url("${gridDataUrl}")`,
             backgroundSize: `${snapPx}px ${snapPx}px`,
             pointerEvents: "none", zIndex: 1, opacity: 0.4,
-          }} />
+          }} data-export-ignore />
         )}
 
         {dragGuides && dragGuides.parentId === null && <GuideLines {...dragGuides} />}

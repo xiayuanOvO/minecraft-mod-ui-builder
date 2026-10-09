@@ -28,7 +28,7 @@ export type DragGuidesInfo = {
 // coordinate space so no offset math is needed.
 export function GuideLines({ containerW, containerH, vCenter, hCenter, shiftAxis, shiftX, shiftY, siblingLines }: DragGuidesInfo) {
   return (
-    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1000 }}>
+    <div data-export-ignore style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1000 }}>
       {vCenter && (
         <div style={{ position: "absolute", left: containerW / 2, top: 0, width: 1, height: containerH, background: SNAP_GUIDE_COLOR }} />
       )}

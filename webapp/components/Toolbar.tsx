@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderDown, FolderUp, BookOpen, Clipboard, Grid3x3 } from "lucide-react";
+import { FolderDown, FolderUp, BookOpen, Clipboard, Grid3x3, Image } from "lucide-react";
 import Link from "next/link";
 import type { ScreenSpec, BindingsSchema } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,8 @@ interface Props {
   onExportProject: () => void;
   onImportProject: () => void;
   onCopyJava: () => void;
+  onExportPng: () => void;
+  exportingPng: boolean;
   onResetTextures: () => Promise<void>;
   onViewTextures: () => void;
   onExtractPack: (file: File) => Promise<{ extracted: string[]; missing: string[] }>;
@@ -50,6 +52,7 @@ export default function Toolbar({
   screen, gridSize, showGrid, snapToParent, snapToSiblings, canUndo, canRedo, tryMode,
   onUndo, onRedo, onGridSizeChange, onToggleGrid, onToggleSnapToParent, onToggleSnapToSiblings, onToggleTryMode,
   onScreenChange, onExportProject, onImportProject, onCopyJava, onResetTextures, onViewTextures, onExtractPack,
+  onExportPng, exportingPng,
   scale, onZoomIn, onZoomOut, onZoomReset, onSaveToTestMod,
   bindingsSchema, onUpdateBindingsSchema, actions, onUpdateActions, modId,
 }: Props) {
@@ -160,6 +163,9 @@ export default function Toolbar({
         </Button>
         <Button variant="ghost" size="sm" className="h-8 w-8 px-0" onClick={onExportProject} title="Export project (all screens)">
           <FolderDown className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" className="h-8 w-8 px-0" onClick={onExportPng} disabled={exportingPng} title="Export active screen as PNG" aria-label="Export active screen as PNG">
+          <Image className="h-4 w-4" />
         </Button>
         <Separator orientation="vertical" className="h-5" />
         <BindingsModal

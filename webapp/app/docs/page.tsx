@@ -234,6 +234,7 @@ export default function DocsPage() {
               ["− N× +", "Zoom controls"],
               ["▶ Try", "Enter interactive preview mode"],
               ["↑ ↓", "Import / Export JSON"],
+              ["Image icon", "Export active screen as PNG"],
               ["Network icon", "Data Schema (Bindings & Actions)"],
               ["⚙ gear", "Settings (mod ID, theme, textures)"],
               ["? book", "This documentation"],
@@ -711,10 +712,10 @@ screen.on("save_settings", (id, screen, value) -> {
             id="export"
             label="09 — Export"
             title="Export & Import"
-            sub="Your screen as a portable JSON file."
+            sub="Export your screen as JSON for your mod or PNG for sharing."
           />
 
-          <div className="grid sm:grid-cols-2 gap-4 mb-8">
+          <div className="grid sm:grid-cols-3 gap-4 mb-8">
             <div className="rounded-xl border p-5">
               <p className="font-semibold mb-2 text-sm">Export (↓)</p>
               <p className="text-sm text-muted-foreground">
@@ -730,6 +731,13 @@ screen.on("save_settings", (id, screen, value) -> {
                 Click the <strong>upload icon</strong>, select a <Code>.json</Code> file. The current
                 screen is replaced (an undo entry is created). The file must have an <Code>id</Code> and
                 a <Code>widgets</Code> array.
+              </p>
+            </div>
+            <div className="rounded-xl border p-5">
+              <p className="font-semibold mb-2 text-sm">Export PNG</p>
+              <p className="text-sm text-muted-foreground">
+                Click the image icon in the toolbar to download a PNG of the active screen. The image
+                uses the screen&apos;s Minecraft-pixel dimensions and leaves out the editor grid and selection handles.
               </p>
             </div>
           </div>

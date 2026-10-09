@@ -8,6 +8,8 @@ import PropertyPanel from "@/components/PropertyPanel";
 import AppSidebar from "@/components/Sidebar";
 import Toolbar from "@/components/Toolbar";
 import { useTextures } from "@/lib/TextureContext";
+import { toast } from "sonner";
+import { exportCanvasPng } from "@/lib/exportCanvasPng";
 import TexturePickerModal from "@/components/TexturePickerModal";
 import type { ScreenSpec, WidgetSpec } from "@/lib/types";
 import { generateJavaClass } from "@/lib/generateJavaClass";
@@ -136,6 +138,7 @@ export default function EditorPage() {
   const [snapToSiblings, setSnapToSiblings] = useState(true);
   const [scale, setScale] = useState(3);
   const [tryMode, setTryMode] = useState(false);
+  const [exportingPng, setExportingPng] = useState(false);
   const [panX, setPanX] = useState(0);
   const [panY, setPanY] = useState(0);
   const panRef = useRef({ x: 0, y: 0 });
@@ -600,6 +603,30 @@ export default function EditorPage() {
     }
   }, [projectKey, screens]);
 
+  const handleExportPng = useCallback(async () => {
+    const canvas = canvasWrapperRef.current?.querySelector<HTMLElement>("[data-canvas]");
+    if (!canvas) {
+      toast.error("Could not find the screen canvas to export.");
+      return;
+    }
+
+    setExportingPng(true);
+    try {
+      const blob = await exportCanvasPng(canvas, screen.width, screen.height);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${screen.id}.png`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success(`Exported ${screen.id}.png (${screen.width} × ${screen.height}px)`);
+    } catch (error) {
+      toast.error(`Could not export PNG: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setExportingPng(false);
+    }
+  }, [screen.id, screen.width, screen.height]);
+
   const handleImportProjectClick = () => importProjectRef.current?.click();
   const handleImportProjectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -704,6 +731,8 @@ export default function EditorPage() {
             onExportProject={handleExportProject}
             onImportProject={handleImportProjectClick}
             onCopyJava={handleCopyJava}
+            onExportPng={handleExportPng}
+            exportingPng={exportingPng}
             onResetTextures={handleResetTextures}
             onViewTextures={() => setShowTextureDebug(true)}
             onExtractPack={extractPack}
