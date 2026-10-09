@@ -1093,7 +1093,8 @@ function TryWidget({ widget, scale, childMap, zBase, allWidgets }: {
   const isSlider = widget.type === "slider";
   const isInput = widget.type === "input";
   const isPassive = widget.type === "panel" || widget.type === "group"
-    || widget.type === "label" || widget.type === "icon" || widget.type === "tabs";
+    || widget.type === "label" || widget.type === "icon" || widget.type === "tabs"
+    || widget.type === "player_preview";
   const interactState = pressed ? "pressed" : (isInput ? focused : hovered) ? "hovered" : "idle";
 
   const handleSliderPointer = (e: React.PointerEvent) => {

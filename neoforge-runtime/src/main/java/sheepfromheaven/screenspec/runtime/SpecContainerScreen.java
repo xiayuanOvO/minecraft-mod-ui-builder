@@ -318,6 +318,12 @@ public class SpecContainerScreen<T extends AbstractContainerMenu> extends Abstra
             else if (w.type.equals("progress"))  renderProgress(graphics, w);
             else if (w.type.equals("custom"))    renderCustom(graphics, w);
         }
+        for (WidgetSpec w : builder().visibleWidgets()) {
+            if (w.type.equals("player_preview")) {
+                int[] origin = builder().originOf(w);
+                renderer.renderPlayerPreview(graphics, w, origin[0], origin[1]);
+            }
+        }
         for (SlotAreaSpec area : this.containerSpec.slots) {
             if (isAreaVisible(area.id)) drawSlotGrid(graphics, area);
         }

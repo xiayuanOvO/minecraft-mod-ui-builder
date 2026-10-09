@@ -488,6 +488,18 @@ final class SpecWidgetRenderer {
         ctx.drawText(font, label, textX, textY, 0xFFFFFFFF, false);
     }
 
+    /** Renders the empty black viewport and beveled frame used by the player preview widget. */
+    void renderPlayerPreview(GuiGraphicsExtractor graphics, WidgetSpec w, int x, int y) {
+        if (w.w <= 0 || w.h <= 0) return;
+        DrawContext ctx = new McDrawContext(graphics);
+        ctx.fill(x, y, x + w.w, y + w.h, 0xFF000000);
+        if (w.w < 2 || w.h < 2) return;
+        ctx.fill(x, y, x + w.w, y + 1, 0xFF373737);
+        ctx.fill(x, y, x + 1, y + w.h, 0xFF373737);
+        ctx.fill(x + w.w - 1, y, x + w.w, y + w.h, 0xFFFFFFFF);
+        ctx.fill(x, y + w.h - 1, x + w.w, y + w.h, 0xFFFFFFFF);
+    }
+
     /** Blits one nine-slice piece: a {@code srcW x srcH} source region (from a {@code texW x texH} texture) stretched to {@code destW x destH}. */
     private void ninePatch(DrawContext ctx, Identifier tex, int x, int y, int u, int v, int srcW, int srcH, int destW, int destH, int texW, int texH) {
         if (destW <= 0 || destH <= 0) return;

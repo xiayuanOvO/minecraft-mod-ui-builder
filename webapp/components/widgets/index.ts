@@ -12,6 +12,7 @@ import ListVisual from "./list/ListVisual";
 import SpriteVisual from "./sprite/SpriteVisual";
 import ProgressVisual from "./progress/ProgressVisual";
 import InventoryAreaVisual from "./inventory_area/InventoryAreaVisual";
+import PlayerPreviewVisual from "./player_preview/PlayerPreviewVisual";
 import ScrollbarWidgetVisual from "./scrollbar/ScrollbarVisual";
 import RequirementVisual from "./requirement/RequirementVisual";
 import CustomVisual from "./custom/CustomVisual";
@@ -29,6 +30,7 @@ export const WIDGET_VISUAL_REGISTRY: Record<string, ComponentType<VisualProps>> 
   sprite: SpriteVisual,
   progress: ProgressVisual,
   inventory_area: InventoryAreaVisual,
+  player_preview: PlayerPreviewVisual,
   scrollbar: ScrollbarWidgetVisual,
   requirement: RequirementVisual,
   custom: CustomVisual,

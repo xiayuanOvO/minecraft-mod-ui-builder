@@ -124,6 +124,7 @@ const translations: Record<string, string> = {
   "Label": "文本标签",
   "Scrollbar": "滚动条",
   "Inventory Area": "物品栏区域",
+  "Player Preview": "玩家预览",
   "Sprite": "精灵图",
   "Progress Bar": "进度条",
   "Requirement": "需求条件",

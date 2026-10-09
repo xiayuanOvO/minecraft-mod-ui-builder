@@ -251,6 +251,10 @@ public class SpecScreen extends Screen implements ActionHost {
             else if (w.type.equals("sprite"))    renderSprite(graphics, w);
             else if (w.type.equals("progress"))  renderProgress(graphics, w);
             else if (w.type.equals("custom"))    renderCustom(graphics, w);
+            else if (w.type.equals("player_preview")) {
+                int[] origin = builder().originOf(w);
+                renderer.renderPlayerPreview(graphics, w, origin[0], origin[1]);
+            }
         }
         for (var renderable : renderables) {
             renderable.extractRenderState(graphics, mouseX, mouseY, partialTicks);

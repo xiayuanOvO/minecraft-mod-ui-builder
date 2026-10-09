@@ -142,6 +142,17 @@ const WIDGET_REGISTRY: WidgetDef[] = [
     ],
   },
   {
+    type: "player_preview",
+    label: "Player Preview",
+    defaultWidget: {
+      type: "player_preview",
+      x: 8, y: 8, w: 68, h: 91,
+      text: "", icon: null,
+      props: {},
+    },
+    propSchema: [],
+  },
+  {
     type: "sprite",
     label: "Sprite",
     defaultWidget: { type: "sprite", x: 8, y: 8, w: 32, h: 32, text: "", icon: null, props: { src: "", fit: "fill" } },
