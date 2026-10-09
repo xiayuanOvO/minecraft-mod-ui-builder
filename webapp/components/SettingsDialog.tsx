@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { ScreenSpec } from "@/lib/types";
+import { useLocale } from "@/lib/i18n";
 
 interface Props {
   screen: ScreenSpec;
@@ -36,6 +37,7 @@ export default function SettingsDialog({
   const [packResult, setPackResult] = useState<{ extracted: string[]; missing: string[] } | null>(null);
   const packInputRef = useRef<HTMLInputElement>(null);
   const { theme, setTheme } = useTheme();
+  const { t } = useLocale();
 
   const handleReset = async () => {
     setResetLoading(true);
@@ -65,7 +67,7 @@ export default function SettingsDialog({
         size="sm"
         className="h-8 w-8 px-0"
         onClick={() => setOpen(true)}
-        title="Settings"
+        title={t("Settings")}
       >
         <Settings className="h-5 w-5" />
       </Button>
@@ -73,13 +75,13 @@ export default function SettingsDialog({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Settings</DialogTitle>
+            <DialogTitle>{t("Settings")}</DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-5 py-2">
             {/* Project */}
             <section className="flex flex-col gap-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Project</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("Project")}</p>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="settings-modid">Mod ID</Label>
                 <Input
@@ -89,7 +91,7 @@ export default function SettingsDialog({
                   onChange={(e) => onScreenChange({ modId: e.target.value || undefined })}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Namespace prepended to action and binding IDs when no colon is present.
+                  {t("Namespace prepended to action and binding IDs when no colon is present.")}
                 </p>
               </div>
             </section>
@@ -98,19 +100,19 @@ export default function SettingsDialog({
 
             {/* Appearance */}
             <section className="flex flex-col gap-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Appearance</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("Appearance")}</p>
               <div className="flex items-center justify-between">
-                <Label>Theme</Label>
+                <Label>{t("Theme")}</Label>
                 <div className="flex items-center rounded-md border overflow-hidden">
-                  {(["light", "system", "dark"] as const).map((t) => {
-                    const Icon = t === "light" ? Sun : t === "dark" ? Moon : Monitor;
+                  {(["light", "system", "dark"] as const).map((themeOption) => {
+                    const Icon = themeOption === "light" ? Sun : themeOption === "dark" ? Moon : Monitor;
                     return (
                       <button
-                        key={t}
-                        onClick={() => setTheme(t)}
-                        title={t.charAt(0).toUpperCase() + t.slice(1)}
+                        key={themeOption}
+                        onClick={() => setTheme(themeOption)}
+                        title={t(themeOption.charAt(0).toUpperCase() + themeOption.slice(1))}
                         className={`flex h-8 w-9 items-center justify-center transition-colors ${
-                          theme === t
+                          theme === themeOption
                             ? "bg-primary text-primary-foreground"
                             : "bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                         }`}
@@ -127,7 +129,7 @@ export default function SettingsDialog({
 
             {/* Textures */}
             <section className="flex flex-col gap-3">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Textures</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("Textures")}</p>
               <div className="flex flex-col gap-2">
                 <input
                   ref={packInputRef}
@@ -138,18 +140,18 @@ export default function SettingsDialog({
                 />
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm">Load from JAR / Resource Pack</p>
+                    <p className="text-sm">{t("Load from JAR / Resource Pack")}</p>
                     <p className="text-xs text-muted-foreground">
-                      Upload your own <code className="font-mono">1.21.x.jar</code> or a <code className="font-mono">.zip</code> resource pack — textures are extracted client-side and never sent to a server.
+                      {t("Upload your own ")}<code className="font-mono">1.21.x.jar</code>{t(" or a ")}<code className="font-mono">.zip</code>{t(" resource pack — textures are extracted client-side and never sent to a server.")}
                     </p>
                     {packResult && (
                       <p className="text-xs mt-1">
                         <span className="text-green-600 dark:text-green-400">
-                          {packResult.extracted.length} extracted
+                          {packResult.extracted.length} {t("extracted")}
                         </span>
                         {packResult.missing.filter(n => n !== "mc_scrollbar_handle.png").length > 0 && (
                           <span className="text-muted-foreground">
-                            {" · "}not found: {packResult.missing.filter(n => n !== "mc_scrollbar_handle.png").join(", ")}
+                            {" · "}{t("not found:")} {packResult.missing.filter(n => n !== "mc_scrollbar_handle.png").join(", ")}
                           </span>
                         )}
                       </p>
@@ -162,25 +164,25 @@ export default function SettingsDialog({
                     disabled={busy}
                     className="shrink-0"
                   >
-                    {packLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Browse"}
+                    {packLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("Browse")}
                   </Button>
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm">View Textures</p>
-                    <p className="text-xs text-muted-foreground">Browse loaded texture atlas</p>
+                    <p className="text-sm">{t("View Textures")}</p>
+                    <p className="text-xs text-muted-foreground">{t("Browse loaded texture atlas")}</p>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => { setOpen(false); onViewTextures(); }} className="shrink-0">
-                    Open
+                    {t("Open")}
                   </Button>
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm">Reset Textures</p>
-                    <p className="text-xs text-muted-foreground">Remove all custom textures</p>
+                    <p className="text-sm">{t("Reset Textures")}</p>
+                    <p className="text-xs text-muted-foreground">{t("Remove all custom textures")}</p>
                   </div>
                   <Button size="sm" variant="destructive" onClick={handleReset} disabled={busy} className="shrink-0">
-                    {resetLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Reset"}
+                    {resetLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("Reset")}
                   </Button>
                 </div>
               </div>

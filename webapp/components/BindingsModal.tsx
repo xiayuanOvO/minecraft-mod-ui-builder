@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Network, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import BindingsTree from "@/components/BindingsTree";
 import type { BindingsSchema } from "@/lib/types";
+import { useLocale } from "@/lib/i18n";
 
 type Tab = "bindings" | "actions";
 
@@ -25,6 +26,7 @@ interface Props {
 // ── Actions tab ──────────────────────────────────────────────────────────────
 
 function ActionsTab({ actions, onChange, modId }: { actions: string[]; onChange: (a: string[]) => void; modId?: string }) {
+  const { t } = useLocale();
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -46,7 +48,7 @@ function ActionsTab({ actions, onChange, modId }: { actions: string[]; onChange:
 
       {actions.length === 0 && (
         <p className="text-sm text-muted-foreground text-center py-6">
-          No actions defined yet.
+          {t("No actions defined yet.")}
         </p>
       )}
 
@@ -77,7 +79,7 @@ function ActionsTab({ actions, onChange, modId }: { actions: string[]; onChange:
           onKeyDown={e => { if (e.key === "Enter") add(); }}
         />
         <Button size="sm" variant="outline" onClick={add} disabled={!draft.trim()}>
-          <Plus size={13} /> Add
+          <Plus size={13} /> {t("Add")}
         </Button>
       </div>
     </div>
@@ -87,6 +89,7 @@ function ActionsTab({ actions, onChange, modId }: { actions: string[]; onChange:
 // ── Main modal ───────────────────────────────────────────────────────────────
 
 export default function BindingsModal({ schema, onChangeSchema, actions, onChangeActions, modId }: Props) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>("bindings");
   const [jsonMode, setJsonMode] = useState(false);
@@ -123,12 +126,12 @@ export default function BindingsModal({ schema, onChangeSchema, actions, onChang
   };
 
   const scopeNote = modId
-    ? `Properties are qualified as ${modId}.<name> in Java`
-    : "Set a modId in settings to enable scoped path generation";
+    ? `${t("Properties are qualified as")} ${modId}.<name> ${t("in Java")}`
+    : t("Set a modId in settings to enable scoped path generation");
 
   return (
     <>
-      <Button variant="ghost" size="sm" className="h-8 w-8 px-0" title="Edit bindings schema" onClick={handleOpen}>
+      <Button variant="ghost" size="sm" className="h-8 w-8 px-0" title={t("Edit bindings schema")} onClick={handleOpen}>
         <Network className="h-4 w-4" />
       </Button>
 
@@ -137,15 +140,15 @@ export default function BindingsModal({ schema, onChangeSchema, actions, onChang
 
           {/* header */}
           <DialogHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-3 border-b shrink-0">
-            <DialogTitle>Data Schema</DialogTitle>
+            <DialogTitle>{t("Data Schema")}</DialogTitle>
             <div className="flex items-center gap-2">
               {jsonMode ? (
                 <>
-                  <Button size="sm" variant="ghost" onClick={() => setJsonMode(false)}>Cancel</Button>
-                  <Button size="sm" onClick={applyJson}>Apply</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setJsonMode(false)}>{t("Cancel")}</Button>
+                  <Button size="sm" onClick={applyJson}>{t("Apply")}</Button>
                 </>
               ) : (
-                <Button size="sm" variant="outline" onClick={enterJsonMode}>Edit as JSON</Button>
+                <Button size="sm" variant="outline" onClick={enterJsonMode}>{t("Edit as JSON")}</Button>
               )}
             </div>
           </DialogHeader>
@@ -153,21 +156,21 @@ export default function BindingsModal({ schema, onChangeSchema, actions, onChang
           {/* tabs */}
           {!jsonMode && (
             <div className="flex border-b shrink-0">
-              {(["bindings", "actions"] as Tab[]).map(t => (
+              {(["bindings", "actions"] as Tab[]).map(tabName => (
                 <button
-                  key={t}
-                  onClick={() => setTab(t)}
+                  key={tabName}
+                  onClick={() => setTab(tabName)}
                   className={`px-4 py-2 text-xs font-medium capitalize border-b-2 -mb-px transition-colors ${
-                    tab === t
+                    tab === tabName
                       ? "border-foreground text-foreground"
                       : "border-transparent text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {t}
-                  {t === "bindings" && Object.keys(schema).length > 0 && (
+                  {t(tabName)}
+                  {tabName === "bindings" && Object.keys(schema).length > 0 && (
                     <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs">{Object.keys(schema).length}</span>
                   )}
-                  {t === "actions" && actions.length > 0 && (
+                  {tabName === "actions" && actions.length > 0 && (
                     <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs">{actions.length}</span>
                   )}
                 </button>

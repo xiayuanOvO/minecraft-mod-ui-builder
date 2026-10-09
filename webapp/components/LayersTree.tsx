@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import WIDGET_REGISTRY from "@/lib/widgetRegistry";
 import { WIDGET_ICONS, AddWidgetItems } from "@/components/AddWidgetItems";
 import type { WidgetSpec } from "@/lib/types";
+import { useLocale } from "@/lib/i18n";
 
 // ── constants ──────────────────────────────────────────────────────────────────
 
@@ -266,6 +267,7 @@ function TreeNode({
   onCancelRename: () => void;
   renameRef: React.RefObject<HTMLInputElement | null>;
 }) {
+  const { t } = useLocale();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: widget.id });
 
@@ -332,7 +334,7 @@ function TreeNode({
           {/* Eye toggle — always visible so position never shifts on hover */}
           <button
             className="absolute right-1 top-1.5 flex size-5 items-center justify-center rounded hover:bg-sidebar-accent opacity-40 hover:opacity-100"
-            title={widget.hidden ? "Show" : "Hide"}
+            title={widget.hidden ? t("Show") : t("Hide")}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onToggleHidden(widget.id); }}
           >
@@ -343,7 +345,7 @@ function TreeNode({
             {widget.type === "tabs" && (
               <button
                 className="flex size-5 items-center justify-center rounded hover:bg-sidebar-accent"
-                title="Add tab"
+                title={t("Add tab")}
                 onClick={(e) => { e.stopPropagation(); onAdd("tab"); }}
               >
                 <Plus className="size-3" />
@@ -352,14 +354,14 @@ function TreeNode({
             {isContainer && widget.type !== "tabs" && <AddWidgetButton onAdd={onAdd} />}
             <button
               className="flex size-5 items-center justify-center rounded hover:bg-sidebar-accent"
-              title="Rename"
+              title={t("Rename")}
               onClick={(e) => { e.stopPropagation(); onStartRename(); }}
             >
               <Pencil className="size-3" />
             </button>
             <button
               className="flex size-5 items-center justify-center rounded hover:bg-sidebar-accent"
-              title="Delete"
+              title={t("Delete")}
               onClick={(e) => { e.stopPropagation(); onDelete(widget.id); }}
             >
               <Trash2 className="size-3" />
@@ -414,13 +416,14 @@ function AddWidgetButton({ onAdd, asGroupAction }: {
   asGroupAction?: boolean;
 }) {
   const { onOpen, onClose } = use(OpenCountCtx);
+  const { t } = useLocale();
 
   const trigger = asGroupAction
-    ? <SidebarGroupAction title="Add widget" render={<DropdownMenuTrigger />}><Plus /></SidebarGroupAction>
+    ? <SidebarGroupAction title={t("Add widget")} render={<DropdownMenuTrigger />}><Plus /></SidebarGroupAction>
     : (
       <DropdownMenuTrigger
         className="flex size-5 items-center justify-center rounded hover:bg-sidebar-accent"
-        title="Add child"
+        title={t("Add child")}
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >
         <Plus className="size-3" />

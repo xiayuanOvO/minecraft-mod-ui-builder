@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AlignLeft, AlignCenter, AlignRight } from "lucide-react";
+import { useLocale } from "@/lib/i18n";
 
 const BINDING_TARGETS: Record<string, string[]> = {
   button:        ["text", "enabled", "visible"],
@@ -55,16 +56,17 @@ interface Props {
 }
 
 export default function PropertyPanel({ widget, onUpdate, bindingsSchema, actions, onCreateAction, inventoryAreaIds = [] }: Props) {
+  const { t } = useLocale();
+  const { packTextures } = useTextures();
+  const [texPickerOpen, setTexPickerOpen] = useState(false);
   if (!widget) {
     return (
       <div className="flex flex-col gap-2 p-3 text-xs text-muted-foreground italic">
-        Select a widget to edit its properties.
+        {t("Select a widget to edit its properties.")}
       </div>
     );
   }
 
-  const { packTextures } = useTextures();
-  const [texPickerOpen, setTexPickerOpen] = useState(false);
   const def = getWidgetDef(widget.type);
 
   const set = (patch: Partial<WidgetSpec>) => onUpdate({ ...widget, ...patch });
@@ -98,7 +100,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
 
   return (
     <div className="flex flex-col gap-1 p-2 text-xs overflow-y-auto">
-      <div className="font-bold text-foreground mb-1 uppercase tracking-wide">{def?.label ?? widget.type}</div>
+      <div className="font-bold text-foreground mb-1 uppercase tracking-wide">{t(def?.label ?? widget.type)}</div>
 
       <Field label="ID">
         <Input
@@ -122,7 +124,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
       )}
 
       {widget.type !== "group" && widget.type !== "checkbox" && (
-        <Field label="Text">
+        <Field label={t("Text")}>
           <Input
             className={`h-6 text-xs px-1.5 ${bindings.text ? "text-blue-500 italic" : ""}`}
             value={bindings.text ? bindings.text : (widget.text ?? "")}
@@ -133,13 +135,13 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
       )}
 
       {widget.type === "requirement" && (
-        <Field label="Icon">
+        <Field label={t("Icon")}>
           {Object.keys(packTextures).length === 0 ? (
-            <p className="text-xs text-muted-foreground italic">Extract a resource pack first</p>
+            <p className="text-xs text-muted-foreground italic">{t("Extract a resource pack first")}</p>
           ) : (
             <div className="flex flex-col gap-1">
               <button
-                title="Change icon"
+                title={t("Change icon")}
                 onClick={() => setTexPickerOpen(true)}
                 className="w-full rounded border border-input hover:border-ring overflow-hidden transition-colors cursor-pointer"
                 style={{ background: "#555", aspectRatio: widget.icon && packTextures[widget.icon] ? undefined : "16/9" }}
@@ -153,7 +155,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
                     style={{ width: "100%", height: "100%", objectFit: "contain", imageRendering: "pixelated", display: "block" }}
                   />
                 ) : (
-                  <span className="flex items-center justify-center py-4 text-xs text-muted-foreground">Pick icon…</span>
+                  <span className="flex items-center justify-center py-4 text-xs text-muted-foreground">{t("Pick icon…")}</span>
                 )}
               </button>
               {widget.icon && <p className="text-[10px] text-muted-foreground truncate">{widget.icon}</p>}
@@ -171,7 +173,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
 
       {propSchema.length > 0 && (
         <>
-          <div className="font-semibold text-muted-foreground mt-1">Widget Props</div>
+          <div className="font-semibold text-muted-foreground mt-1">{t("Widget Props")}</div>
           {(() => {
             const rendered = new Set<number>();
             return propSchema.map((field, i) => {
@@ -181,7 +183,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
               // Scrollbar axis — special swap logic
               if (widget.type === "scrollbar" && field.key === "axis") {
                 return (
-                  <Field key={field.key} label={field.label}>
+                  <Field key={field.key} label={t(field.label)}>
                     <PropSelect
                       value={currentValue}
                       options={field.options ?? []}
@@ -204,7 +206,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
                 const opts = inventoryAreaIds.map((id) => ({ value: id, label: id }));
                 const hasOrphan = !!currentValue && !inventoryAreaIds.includes(currentValue);
                 return (
-                  <Field key={field.key} label={field.label}>
+                  <Field key={field.key} label={t(field.label)}>
                     <PropSelect
                       value={currentValue}
                       options={["", ...inventoryAreaIds]}
@@ -220,13 +222,13 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
               if (widget.type === "sprite" && field.key === "src") {
                 const hasPackTextures = Object.keys(packTextures).length > 0;
                 return (
-                  <Field key={field.key} label={field.label}>
+                  <Field key={field.key} label={t(field.label)}>
                     {!hasPackTextures ? (
-                      <p className="text-xs text-muted-foreground italic">Extract a resource pack first</p>
+                      <p className="text-xs text-muted-foreground italic">{t("Extract a resource pack first")}</p>
                     ) : (
                       <div className="flex flex-col gap-1">
                         <button
-                          title="Change texture"
+                          title={t("Change texture")}
                           onClick={() => setTexPickerOpen(true)}
                           className="w-full rounded border border-input hover:border-ring overflow-hidden transition-colors cursor-pointer"
                           style={{ background: "#555", aspectRatio: currentValue && packTextures[currentValue] ? undefined : "16/9" }}
@@ -240,7 +242,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
                               style={{ width: "100%", height: "100%", objectFit: "contain", imageRendering: "pixelated", display: "block" }}
                             />
                           ) : (
-                            <span className="flex items-center justify-center py-4 text-xs text-muted-foreground">Pick texture…</span>
+                            <span className="flex items-center justify-center py-4 text-xs text-muted-foreground">{t("Pick texture…")}</span>
                           )}
                         </button>
                         {currentValue && (
@@ -277,7 +279,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
               if (field.key === "color" || field.key === "color_met" || field.key === "color_unmet") {
                 const colorInt = parseInt(currentValue, 10) || 0;
                 return (
-                  <Field key={field.key} label={field.label}>
+                  <Field key={field.key} label={t(field.label)}>
                     <div className="flex items-center gap-1.5">
                       <input
                         type="color"
@@ -296,7 +298,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
                 const checked = currentValue === "true";
                 return (
                   <div key={field.key} className="flex items-center justify-between">
-                    <span className="text-muted-foreground">{field.label}</span>
+                    <span className="text-muted-foreground">{t(field.label)}</span>
                     <Toggle checked={checked} onChange={(v) => setProp(field.key, String(v))} />
                   </div>
                 );
@@ -305,7 +307,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
               // Alignment icon buttons
               if (field.key === "align") {
                 return (
-                  <Field key={field.key} label={field.label}>
+                  <Field key={field.key} label={t(field.label)}>
                     <div className="flex gap-1">
                       {(["left", "center", "right"] as const).map((opt) => (
                         <button
@@ -335,8 +337,8 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
                 rendered.add(maxIdx);
                 return (
                   <div key="min-max" className="grid grid-cols-2 gap-1">
-                    <Field label="Min"><NumInput value={parseInt(currentValue, 10) || 0} onChange={(v) => setProp(field.key, String(v))} /></Field>
-                    <Field label="Max"><NumInput value={parseInt(maxValue, 10) || 0} onChange={(v) => setProp(maxField.key, String(v))} /></Field>
+                    <Field label={t("Min")}><NumInput value={parseInt(currentValue, 10) || 0} onChange={(v) => setProp(field.key, String(v))} /></Field>
+                    <Field label={t("Max")}><NumInput value={parseInt(maxValue, 10) || 0} onChange={(v) => setProp(maxField.key, String(v))} /></Field>
                   </div>
                 );
               }
@@ -344,7 +346,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
               // Select
               if (field.type === "select") {
                 return (
-                  <Field key={field.key} label={field.label}>
+                    <Field key={field.key} label={t(field.label)}>
                     <PropSelect
                       value={currentValue}
                       options={field.options ?? []}
@@ -356,7 +358,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
 
               // Number or text
               return (
-                <Field key={field.key} label={field.label}>
+                <Field key={field.key} label={t(field.label)}>
                   <Input
                     className="h-6 text-xs px-1.5"
                     type={field.type === "number" ? "number" : "text"}
@@ -371,7 +373,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
       )}
 
       {widget.type !== "group" && (
-        <Field label="Action">
+        <Field label={t("Action")}>
           <ActionSelect
             value={widget.action ?? ""}
             actions={actions}
@@ -383,7 +385,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
 
       {availableTargets.length > 0 && (
         <>
-          <div className="font-semibold text-muted-foreground mt-1">Bindings</div>
+          <div className="font-semibold text-muted-foreground mt-1">{t("Bindings")}</div>
           {Object.entries(bindings).map(([target, path]) => {
             const expectedType = BINDING_TARGET_TYPES[target] ?? "string";
             const paths = getPathsByType(bindingsSchema, expectedType);
@@ -406,7 +408,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
                   onChange={(e) => setBinding(target, e.target.value)}
                 >
                   {paths.length === 0 && (
-                    <option value="" disabled>No {expectedType} bindings defined</option>
+                    <option value="" disabled>{t(`No ${expectedType} bindings defined`)}</option>
                   )}
                   {!paths.includes(path) && path && (
                     <option value={path}>{path} ⚠ wrong type</option>
@@ -494,6 +496,7 @@ function ActionSelect({
   onChange: (v: string) => void;
   onCreateAction?: (name: string) => void;
 }) {
+  const { t } = useLocale();
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState("");
 
@@ -509,7 +512,7 @@ function ActionSelect({
         <Input
           autoFocus
           className="h-6 text-xs px-1.5 flex-1"
-          placeholder="action name"
+          placeholder={t("action name")}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -521,7 +524,7 @@ function ActionSelect({
           className="shrink-0 text-xs px-1.5 rounded border border-input bg-background hover:bg-accent"
           onClick={confirm}
         >
-          Add
+          {t("Add")}
         </button>
       </div>
     );
@@ -537,14 +540,14 @@ function ActionSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="" className="text-xs py-0.5">
-          <span className="text-muted-foreground">(none)</span>
+          <span className="text-muted-foreground">{t("(none)")}</span>
         </SelectItem>
         {actions.map((a) => (
           <SelectItem key={a} value={a} className="text-xs py-0.5">{a}</SelectItem>
         ))}
         {onCreateAction && (
           <SelectItem value="__create__" className="text-xs py-0.5 text-muted-foreground italic">
-            + Create new action…
+            + {t("Create new action…")}
           </SelectItem>
         )}
       </SelectContent>
@@ -565,6 +568,7 @@ function PropSelect({
   onChange: (v: string) => void;
   extraOptions?: string[];
 }) {
+  const { t } = useLocale();
   const allOptions = [...new Set([...options, ...extraOptions])];
   return (
     <Select value={value} onValueChange={(v) => onChange(v ?? "")}>
@@ -574,7 +578,7 @@ function PropSelect({
       <SelectContent>
         {allOptions.map((opt) => (
           <SelectItem key={opt} value={opt} className="text-xs py-0.5">
-            {(labels[opt] ?? opt) || <span className="text-muted-foreground">(none)</span>}
+            {(labels[opt] ?? t(opt)) || <span className="text-muted-foreground">{t("(none)")}</span>}
           </SelectItem>
         ))}
       </SelectContent>

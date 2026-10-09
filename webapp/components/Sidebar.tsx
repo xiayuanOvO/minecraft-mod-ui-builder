@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import LayersTree from "@/components/LayersTree";
 import type { ScreenSpec, WidgetSpec } from "@/lib/types";
+import { useLocale } from "@/lib/i18n";
 
 interface Props {
   screens: ScreenSpec[];
@@ -51,6 +52,7 @@ interface Props {
 }
 
 function SortableScreenItem({ id, children }: { id: string; children: ReactNode }) {
+  const { t } = useLocale();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   return (
     <SidebarMenuItem
@@ -61,7 +63,7 @@ function SortableScreenItem({ id, children }: { id: string; children: ReactNode 
       <button
         {...attributes}
         {...listeners}
-        title="Drag to reorder"
+        title={t("Drag to reorder")}
         className="absolute left-0.5 top-1.5 flex h-5 w-4 cursor-grab items-center justify-center text-muted-foreground hover:text-foreground [&>svg]:size-3.5"
       >
         <GripVertical />
@@ -76,6 +78,7 @@ export default function AppSidebar({
   onGoHome, onSelectScreen, onAddScreen, onRemoveScreen, onRenameScreen, onMoveScreen, onImportScreen, onExportScreen,
   onAddWidget, onSelectWidget, onDeleteWidget, onToggleHiddenWidget, onRenameWidget, onReparentWidget, onReorderWidget,
 }: Props) {
+  const { t } = useLocale();
   const [screensOpen, setScreensOpen] = useState(true);
   const [layersOpen, setLayersOpen] = useState(true);
   const [renamingIdx, setRenamingIdx] = useState<number | null>(null);
@@ -114,11 +117,11 @@ export default function AppSidebar({
     <Sidebar collapsible="offcanvas">
       <SidebarHeader className="border-b">
         <div className="flex h-8 items-center gap-1 px-1">
-          <Button variant="ghost" size="sm" className="h-7 w-7 px-0 shrink-0" onClick={onGoHome} title="Back to projects">
+          <Button variant="ghost" size="sm" className="h-7 w-7 px-0 shrink-0" onClick={onGoHome} title={t("Back to projects")}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="font-semibold truncate text-sidebar-foreground">
-            {modId || "Unnamed project"}
+            {modId || t("Unnamed project")}
           </span>
         </div>
       </SidebarHeader>
@@ -134,13 +137,13 @@ export default function AppSidebar({
             {screensOpen
               ? <ChevronDown className="mr-1 h-3.5 w-3.5" />
               : <ChevronRight className="mr-1 h-3.5 w-3.5" />}
-            Screens
+            {t("Screens")}
           </SidebarGroupLabel>
 
-          <SidebarGroupAction title="Import screen JSON" onClick={onImportScreen} className="right-8">
+          <SidebarGroupAction title={t("Import screen JSON")} onClick={onImportScreen} className="right-8">
             <Upload />
           </SidebarGroupAction>
-          <SidebarGroupAction title="Add screen" onClick={onAddScreen}>
+          <SidebarGroupAction title={t("Add screen")} onClick={onAddScreen}>
             <Plus />
           </SidebarGroupAction>
 
@@ -179,21 +182,21 @@ export default function AppSidebar({
                             {/* Hover actions — three buttons in a row, absolutely positioned */}
                             <div className="absolute right-1 top-1.5 hidden items-center gap-0.5 group-hover/menu-item:flex">
                               <button
-                                title="Export screen JSON"
+                                title={t("Export screen JSON")}
                                 onClick={e => { e.stopPropagation(); onExportScreen(idx); }}
                                 className="flex h-5 w-5 items-center justify-center rounded-md hover:bg-sidebar-accent [&>svg]:size-3.5"
                               >
                                 <Download />
                               </button>
                               <button
-                                title="Rename"
+                                title={t("Rename")}
                                 onClick={e => { e.stopPropagation(); startRename(idx); }}
                                 className="flex h-5 w-5 items-center justify-center rounded-md hover:bg-sidebar-accent [&>svg]:size-3.5"
                               >
                                 <Pencil />
                               </button>
                               <button
-                                title="Delete"
+                                title={t("Delete")}
                                 disabled={screens.length <= 1}
                                 onClick={e => { e.stopPropagation(); onRemoveScreen(idx); }}
                                 className="flex h-5 w-5 items-center justify-center rounded-md hover:bg-sidebar-accent disabled:pointer-events-none disabled:opacity-30 [&>svg]:size-3.5"
@@ -223,7 +226,7 @@ export default function AppSidebar({
             {layersOpen
               ? <ChevronDown className="mr-1 h-3.5 w-3.5" />
               : <ChevronRight className="mr-1 h-3.5 w-3.5" />}
-            Layers
+            {t("Layers")}
           </SidebarGroupLabel>
 
           {layersOpen && (

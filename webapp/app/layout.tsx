@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { TextureProvider } from "@/lib/TextureContext";
 import { PostHogProvider } from "@/components/PostHogProvider";
+import { LocaleProvider } from "@/lib/i18n";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -40,7 +41,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
           <PostHogProvider>
-            <TextureProvider>{children}</TextureProvider>
+            <LocaleProvider>
+              <TextureProvider>{children}</TextureProvider>
+            </LocaleProvider>
             <Toaster />
           </PostHogProvider>
         </ThemeProvider>

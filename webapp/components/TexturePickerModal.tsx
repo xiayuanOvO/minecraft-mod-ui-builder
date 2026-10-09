@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useLocale } from "@/lib/i18n";
 
 interface Props {
   open: boolean;
@@ -114,6 +115,7 @@ function FolderItem({
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
 export default function TexturePickerModal({ open, packTextures, current, onSelect, onClose }: Props) {
+  const { t } = useLocale();
   const [filter, setFilter] = useState("");
   const [folder, setFolder] = useState("");
   const [selected, setSelected] = useState(current);
@@ -121,6 +123,8 @@ export default function TexturePickerModal({ open, packTextures, current, onSele
 
   useEffect(() => {
     if (open) {
+      // Opening the picker intentionally resets its draft selection to the current texture.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelected(current);
       setFilter("");
       // Pre-select the folder of the current texture
@@ -169,7 +173,7 @@ export default function TexturePickerModal({ open, packTextures, current, onSele
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="w-[90vw] max-w-7xl h-[85vh] flex flex-col gap-0 p-0 overflow-hidden">
         <DialogHeader className="px-4 pt-4 pb-3 shrink-0 border-b">
-          <DialogTitle>Pick texture</DialogTitle>
+          <DialogTitle>{t("Pick texture")}</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-1 min-h-0 select-none">
@@ -179,7 +183,7 @@ export default function TexturePickerModal({ open, packTextures, current, onSele
             <div className="p-2 border-b shrink-0">
               <Input
                 ref={searchRef}
-                placeholder="Search…"
+                placeholder={t("Search…")}
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
                 className="h-7 text-xs"
@@ -194,7 +198,7 @@ export default function TexturePickerModal({ open, packTextures, current, onSele
                     folder === "" ? "bg-blue-500 text-white" : "hover:bg-gray-100 dark:hover:bg-gray-800",
                   ].join(" ")}
                 >
-                  All textures
+                  {t("All textures")}
                 </button>
                 <FolderTree node={tree} prefix="" selected={folder} onSelect={setFolder} />
               </div>
@@ -247,7 +251,7 @@ export default function TexturePickerModal({ open, packTextures, current, onSele
               })}
               {visibleKeys.length === 0 && (
                 <p className="col-span-full text-xs text-muted-foreground text-center py-12">
-                  {searching ? "No textures match" : "Empty folder"}
+                  {searching ? t("No textures match") : t("Empty folder")}
                 </p>
               )}
             </div>
@@ -273,7 +277,7 @@ export default function TexturePickerModal({ open, packTextures, current, onSele
                   style={{ width: "90%", height: "90%", objectFit: "contain", imageRendering: "pixelated" }}
                 />
               ) : (
-                <span className="text-xs text-gray-400 text-center px-2">select a texture to preview</span>
+                <span className="text-xs text-gray-400 text-center px-2">{t("select a texture to preview")}</span>
               )}
             </div>
 
@@ -287,9 +291,9 @@ export default function TexturePickerModal({ open, packTextures, current, onSele
                 disabled={!selected}
                 onClick={() => { onSelect(selected); onClose(); }}
               >
-                Select
+                {t("Select")}
               </Button>
-              <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
+              <Button variant="outline" size="sm" onClick={onClose}>{t("Cancel")}</Button>
             </div>
           </div>
 

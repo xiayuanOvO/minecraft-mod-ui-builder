@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import WIDGET_REGISTRY from "@/lib/widgetRegistry";
+import { useLocale } from "@/lib/i18n";
 
 export const WIDGET_ICONS: Record<string, React.ElementType> = {
   group:         Folder,
@@ -26,6 +27,7 @@ export const WIDGET_ICONS: Record<string, React.ElementType> = {
 };
 
 export function AddWidgetItems({ onAdd }: { onAdd: (type: string) => void }) {
+  const { t } = useLocale();
   return (
     <>
       {WIDGET_REGISTRY.filter(def => def.type !== "tab").map(def => {
@@ -33,7 +35,7 @@ export function AddWidgetItems({ onAdd }: { onAdd: (type: string) => void }) {
         return (
           <DropdownMenuItem key={def.type} onClick={() => onAdd(def.type)}>
             <Icon className="size-3.5 mr-2" />
-            {def.label}
+            {t(def.label)}
           </DropdownMenuItem>
         );
       })}

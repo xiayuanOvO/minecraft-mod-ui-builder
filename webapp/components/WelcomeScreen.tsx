@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Trash2, FolderOpen } from "lucide-react";
+import LanguageToggle from "@/components/LanguageToggle";
+import { useLocale } from "@/lib/i18n";
 import {
   Dialog,
   DialogContent,
@@ -28,14 +30,14 @@ interface Props {
   onEditTestScreen?: () => void;
 }
 
-function relativeTime(ts: number): string {
+function relativeTime(ts: number, locale: "en" | "zh"): string {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return locale === "zh" ? "刚刚" : "just now";
+  if (mins < 60) return locale === "zh" ? `${mins} 分钟前` : `${mins}m ago`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
+  if (hours < 24) return locale === "zh" ? `${hours} 小时前` : `${hours}h ago`;
+  return locale === "zh" ? `${Math.floor(hours / 24)} 天前` : `${Math.floor(hours / 24)}d ago`;
 }
 
 export default function WelcomeScreen({ projects, onOpenProject, onCreateProject, onLoadProject, onDeleteProject, onEditTestScreen }: Props) {
@@ -44,6 +46,7 @@ export default function WelcomeScreen({ projects, onOpenProject, onCreateProject
   const [screenId, setScreenId] = useState("main");
   const [pendingDelete, setPendingDelete] = useState<ProjectSummary | null>(null);
   const loadInputRef = useRef<HTMLInputElement>(null);
+  const { locale, t } = useLocale();
 
   const canCreate = modId.trim().length > 0;
 
@@ -53,11 +56,12 @@ export default function WelcomeScreen({ projects, onOpenProject, onCreateProject
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-background">
+    <div className="relative flex min-h-screen flex-col items-center justify-center gap-8 bg-background">
+      <div className="absolute right-5 top-5"><LanguageToggle /></div>
       <div className="text-center">
         <h1 className="text-3xl font-bold tracking-tight">MC Screen Designer</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Visual designer for Minecraft mod GUI screens
+          {t("Visual designer for Minecraft mod GUI screens")}
         </p>
       </div>
 
@@ -65,7 +69,7 @@ export default function WelcomeScreen({ projects, onOpenProject, onCreateProject
         {projects.length === 0 ? (
           <>
             <div className="text-5xl select-none">🗂️</div>
-            <p className="text-sm text-muted-foreground">No projects yet</p>
+            <p className="text-sm text-muted-foreground">{t("No projects yet")}</p>
           </>
         ) : (
           <div className="flex flex-col gap-2 w-full">
@@ -84,7 +88,7 @@ export default function WelcomeScreen({ projects, onOpenProject, onCreateProject
                   )}
                 </button>
                 <span className="text-xs text-muted-foreground shrink-0 ml-4">
-                  {relativeTime(p.updatedAt)}
+                  {relativeTime(p.updatedAt, locale)}
                 </span>
                 {onDeleteProject && (
                   <Button
@@ -103,7 +107,7 @@ export default function WelcomeScreen({ projects, onOpenProject, onCreateProject
           </div>
         )}
 
-        <Button className="w-full" onClick={() => setOpen(true)}>+ New Project</Button>
+        <Button className="w-full" onClick={() => setOpen(true)}>+ {t("New Project")}</Button>
         {onLoadProject && (
           <>
             <Button
@@ -112,7 +116,7 @@ export default function WelcomeScreen({ projects, onOpenProject, onCreateProject
               onClick={() => loadInputRef.current?.click()}
             >
               <FolderOpen className="mr-2 size-4" />
-              Load Project
+              {t("Load Project")}
             </Button>
             <input
               ref={loadInputRef}
@@ -129,7 +133,7 @@ export default function WelcomeScreen({ projects, onOpenProject, onCreateProject
         )}
         {process.env.NODE_ENV === "development" && onEditTestScreen && (
           <Button className="w-full" variant="outline" onClick={onEditTestScreen}>
-            Edit test screen
+            {t("Edit test screen")}
           </Button>
         )}
       </div>
@@ -137,7 +141,7 @@ export default function WelcomeScreen({ projects, onOpenProject, onCreateProject
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>New Project</DialogTitle>
+            <DialogTitle>{t("New Project")}</DialogTitle>
           </DialogHeader>
 
           <div className="flex flex-col gap-4 py-2">
@@ -154,12 +158,12 @@ export default function WelcomeScreen({ projects, onOpenProject, onCreateProject
                 onKeyDown={(e) => e.key === "Enter" && submit()}
               />
               <p className="text-xs text-muted-foreground">
-                Your mod's namespace — qualifies binding and action IDs automatically
+                {t("Your mod's namespace — qualifies binding and action IDs automatically")}
               </p>
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="screenId">First screen ID</Label>
+              <Label htmlFor="screenId">{t("First screen ID")}</Label>
               <Input
                 id="screenId"
                 placeholder="main"
@@ -172,10 +176,10 @@ export default function WelcomeScreen({ projects, onOpenProject, onCreateProject
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button disabled={!canCreate} onClick={submit}>
-              Create
+              {t("Create")}
             </Button>
           </div>
         </DialogContent>
@@ -184,16 +188,16 @@ export default function WelcomeScreen({ projects, onOpenProject, onCreateProject
       <Dialog open={pendingDelete !== null} onOpenChange={(v) => { if (!v) setPendingDelete(null); }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete project?</DialogTitle>
+            <DialogTitle>{t("Delete project?")}</DialogTitle>
           </DialogHeader>
 
           <p className="text-sm text-muted-foreground py-2">
-            {pendingDelete && `"${pendingDelete.screenId || "(unnamed)"}"`} will be permanently deleted. This can&apos;t be undone.
+            {pendingDelete && `"${pendingDelete.screenId || "(unnamed)"}"`} {t("will be permanently deleted. This can't be undone.")}
           </p>
 
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setPendingDelete(null)}>
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               variant="destructive"
@@ -202,7 +206,7 @@ export default function WelcomeScreen({ projects, onOpenProject, onCreateProject
                 setPendingDelete(null);
               }}
             >
-              Delete
+              {t("Delete")}
             </Button>
           </div>
         </DialogContent>

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Plus, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 import type { BindingNode, BindingType, BindingsSchema } from "@/lib/types";
+import { useLocale } from "@/lib/i18n";
 
 interface Props {
   schema: BindingsSchema;
@@ -46,6 +47,7 @@ interface AddFormProps {
 }
 
 function AddPropertyForm({ indent = 0, nameRef, name, onName, type, onType, preview, onPreview, onAdd, onCancel }: AddFormProps) {
+  const { t } = useLocale();
   const inputCls = "rounded border border-sidebar-border bg-sidebar px-2 py-1 text-xs text-sidebar-foreground placeholder-sidebar-foreground/30 focus:border-sidebar-ring focus:outline-none";
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -59,7 +61,7 @@ function AddPropertyForm({ indent = 0, nameRef, name, onName, type, onType, prev
         <input
           ref={nameRef}
           className={inputCls + " flex-1 min-w-0"}
-          placeholder="name"
+          placeholder={t("name")}
           value={name}
           onChange={e => onName(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -82,13 +84,13 @@ function AddPropertyForm({ indent = 0, nameRef, name, onName, type, onType, prev
               checked={preview === "true"}
               onChange={e => onPreview(e.target.checked ? "true" : "false")}
             />
-            <span className="text-sidebar-foreground/50">preview value</span>
+            <span className="text-sidebar-foreground/50">{t("preview value")}</span>
           </label>
         ) : (
           <input
             type={type === "number" ? "number" : "text"}
             className={inputCls + " flex-1 min-w-0"}
-            placeholder="preview value (optional)"
+            placeholder={t("preview value (optional)")}
             value={preview}
             onChange={e => onPreview(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -99,7 +101,7 @@ function AddPropertyForm({ indent = 0, nameRef, name, onName, type, onType, prev
           onClick={onAdd}
           disabled={!name.trim()}
         >
-          Add
+          {t("Add")}
         </button>
       </div>
     </div>
@@ -117,6 +119,7 @@ interface NodeProps {
 }
 
 function NodeRow({ name, node, siblings, onChangeSiblings, depth }: NodeProps) {
+  const { t } = useLocale();
   const [expanded, setExpanded] = useState(true);
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(name);
@@ -215,7 +218,7 @@ function NodeRow({ name, node, siblings, onChangeSiblings, depth }: NodeProps) {
           <span
             className="min-w-0 flex-1 truncate text-xs text-sidebar-foreground cursor-pointer"
             onDoubleClick={() => { setNameValue(name); setEditingName(true); }}
-            title="Double-click to rename"
+            title={t("Double-click to rename")}
           >
             {name}
           </span>
@@ -223,14 +226,14 @@ function NodeRow({ name, node, siblings, onChangeSiblings, depth }: NodeProps) {
 
         <button
           className="hidden shrink-0 text-sidebar-foreground/40 hover:text-sidebar-foreground group-hover:flex"
-          title="Add child property"
+          title={t("Add child property")}
           onClick={addChild}
         >
           <Plus size={12} />
         </button>
         <button
           className="hidden shrink-0 text-sidebar-foreground/40 hover:text-destructive group-hover:flex"
-          title="Delete"
+          title={t("Delete")}
           onClick={deleteself}
         >
           <Trash2 size={12} />
@@ -264,13 +267,13 @@ function NodeRow({ name, node, siblings, onChangeSiblings, depth }: NodeProps) {
               checked={node.previewValue === true}
               onChange={e => selfUpdate({ ...node, previewValue: e.target.checked })}
             />
-            preview
+            {t("preview")}
           </label>
         ) : (
           <input
             type={nodeType === "number" ? "number" : "text"}
             className="min-w-0 flex-1 rounded border border-sidebar-border bg-sidebar px-1 py-0 text-xs text-sidebar-foreground/60 placeholder-sidebar-foreground/30 focus:border-sidebar-ring focus:outline-none"
-            placeholder="preview value"
+            placeholder={t("preview value")}
             value={node.previewValue as string ?? ""}
             onChange={e => {
               const raw = e.target.value;
