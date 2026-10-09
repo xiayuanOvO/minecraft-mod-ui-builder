@@ -876,7 +876,7 @@ function EditWidget({ widget, scale, selectedId, selectedIds, snapPx, draggingPo
         setInlineEdit({ id: widget.id, text: widget.text });
       }}
       style={{
-        outline: isSelected ? SELECTION_OUTLINE : "none",
+        outline: isSelected && !isGroup ? SELECTION_OUTLINE : "none",
         outlineOffset: 1,
         zIndex: zBase,
         cursor: "move",
