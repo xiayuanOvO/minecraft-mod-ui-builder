@@ -3,6 +3,7 @@ package sheepfromheaven.screenspec.runtime;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,7 +40,7 @@ public final class SpecSlots {
         for (int i = 0; i < capacity; i++) {
             int col = i % area.cols;
             int row = i / area.cols;
-            slots.add(new Slot(container, i, area.slotX(col), area.slotY(row)));
+            slots.add(createSlot(area, container, i, col, row));
         }
         return slots;
     }
@@ -51,7 +52,7 @@ public final class SpecSlots {
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < area.cols; col++) {
                 int index = 9 + col + row * area.cols;
-                slots.add(new Slot(playerInventory, index, area.slotX(col), area.slotY(row)));
+                slots.add(createSlot(area, playerInventory, index, col, row));
             }
         }
         return slots;
@@ -61,7 +62,7 @@ public final class SpecSlots {
     public static List<Slot> forPlayerHotbar(SlotAreaSpec area, Inventory playerInventory) {
         List<Slot> slots = new ArrayList<>(area.cols);
         for (int col = 0; col < area.cols; col++) {
-            slots.add(new Slot(playerInventory, col, area.slotX(col), area.slotY(0)));
+            slots.add(createSlot(area, playerInventory, col, col, 0));
         }
         return slots;
     }
@@ -85,7 +86,7 @@ public final class SpecSlots {
                 for (int viewCol = 0; viewCol < visibleCols; viewCol++) {
                     int dataIndex = row * totalCols + viewCol;
                     if (dataIndex < size) {
-                        slots.add(new Slot(container, dataIndex, area.slotX(viewCol), area.slotY(row)));
+                        slots.add(createSlot(area, container, dataIndex, viewCol, row));
                     } else {
                         // partial last column (or an empty container) - an inert off-screen slot keeps the viewport's slot count fixed
                         slots.add(new Slot(container, Math.max(0, size - 1), ScrollableSlotArea.OFFSCREEN, ScrollableSlotArea.OFFSCREEN));
@@ -101,7 +102,7 @@ public final class SpecSlots {
             for (int col = 0; col < cols; col++) {
                 int dataIndex = viewRow * cols + col;
                 if (dataIndex < size) {
-                    slots.add(new Slot(container, dataIndex, area.slotX(col), area.slotY(viewRow)));
+                    slots.add(createSlot(area, container, dataIndex, col, viewRow));
                 } else {
                     // partial last row (or an empty container) - an inert off-screen slot keeps the viewport's slot count fixed
                     slots.add(new Slot(container, Math.max(0, size - 1), ScrollableSlotArea.OFFSCREEN, ScrollableSlotArea.OFFSCREEN));
@@ -109,5 +110,19 @@ public final class SpecSlots {
             }
         }
         return slots;
+    }
+
+    static Slot createSlot(SlotAreaSpec area, Container container, int containerIndex, int col, int row) {
+        return slotWithBackground(container, containerIndex, area.slotX(col), area.slotY(row), area.slotHint(col, row));
+    }
+
+    static Slot slotWithBackground(Container container, int containerIndex, int x, int y, Identifier background) {
+        if (background == null) return new Slot(container, containerIndex, x, y);
+        return new Slot(container, containerIndex, x, y) {
+            @Override
+            public Identifier getNoItemIcon() {
+                return background;
+            }
+        };
     }
 }

@@ -258,7 +258,7 @@ export default function DocsPage() {
 
           <div className="grid sm:grid-cols-2 gap-6 mb-8">
             {[
-              { title: "Select", body: "Click a widget to select it (yellow outline). Clicking inside a group drills in — each click selects a deeper child. Click empty space or press Escape to deselect." },
+              { title: "Select", body: "Click a widget to select it. Click empty space or press Escape to clear the selection. ⌘/Ctrl-click or Shift-click toggles a widget in the current multi-selection." },
               { title: "Move & resize", body: "Drag to move, drag handles to resize. Both snap to the Snap setting. Arrow keys nudge 1 px; Shift + Arrow nudges by snap size." },
               { title: "Copy / Paste", body: "⌘C to copy, ⌘V to paste (+8 px offset). ⌘D duplicates the selected widget in place with the same offset." },
               { title: "Undo / Redo", body: "Full history across all screens in the project, up to 100 entries. ⌘Z / ⌘⇧Z. History is shared — undoing on screen B can restore a change made on screen A." },
@@ -279,7 +279,8 @@ export default function DocsPage() {
               <p>The <strong className="text-foreground">Layers panel</strong> (left sidebar) shows all widgets as a tree. Container widgets can be collapsed.</p>
               <ul className="space-y-2">
                 <li><strong className="text-foreground">Click</strong> a row to select that widget.</li>
-                <li><strong className="text-foreground">Shift-click</strong> a sibling row for multi-select — all widgets between the anchor and target are selected.</li>
+                <li><strong className="text-foreground">⌘/Ctrl-click</strong> rows to add or remove individual widgets from the selection.</li>
+                <li><strong className="text-foreground">Shift-click</strong> a sibling row to select the full range from the anchor.</li>
                 <li><strong className="text-foreground">Drag</strong> rows to reorder. Drop on the middle of a container to reparent the widget inside it.</li>
                 <li><strong className="text-foreground">Hover</strong> a container row for the <Code>+</Code> button to add a child widget directly.</li>
                 <li><strong className="text-foreground">Hover</strong> any row for the trash icon to delete.</li>
@@ -288,8 +289,8 @@ export default function DocsPage() {
           </div>
 
           <Callout kind="tip">
-            Dragging any member of a multi-selection moves the whole group. The drag overlay shows a
-            <Code>+N</Code> badge indicating how many widgets are moving.
+            Dragging any selected widget moves the whole selection. Arrow keys nudge every selected
+            widget, and Delete removes the selection. The properties panel edits the primary widget.
           </Callout>
 
           <Divider />
@@ -572,12 +573,12 @@ screen.on("save_settings", (id, screen, value) -> {
             <div className="rounded-xl border p-5">
               <p className="font-semibold mb-2 text-sm">Built-in (automatic)</p>
               <p className="text-sm text-muted-foreground mb-3">
-                When an <Code>inventory_area</Code>&apos;s viewport is smaller than its full slot grid a
-                built-in 4 px scrollbar appears automatically on the clipping edge.
+                The editor derives an <Code>inventory_area</Code>&apos;s size from its columns, rows,
+                and slot size. At runtime, inventories with more slots than this viewport scroll automatically.
               </p>
               <ul className="text-sm text-muted-foreground space-y-1.5">
-                <li>— Shown as a gradient + <Code>↕</Code> hint in edit mode.</li>
-                <li>— Thumb is draggable in Try Mode; area also responds to mouse wheel.</li>
+                <li>— The designer shows the viewport grid sized by the configured columns and rows.</li>
+                <li>— At runtime, the area scrolls when the bound inventory has more slots than fit.</li>
                 <li>— Suppressed when an explicit <Code>scrollbar</Code> widget targets the same axis.</li>
               </ul>
             </div>
@@ -607,7 +608,7 @@ screen.on("save_settings", (id, screen, value) -> {
               <p>In the Property Panel, set <strong>Target</strong> to <Code>item_slots</Code>. The editor shows a dropdown pre-populated with all valid inventory area IDs on the current screen.</p>
             </Step>
             <Step n={4} title="Verify in Try Mode">
-              <p>Press <Code>T</Code> to enter Try Mode. The scrollbar thumb should be draggable and scroll the inventory area.</p>
+              <p>Press <Code>T</Code> to check the configured viewport size. At runtime, the linked scrollbar moves through the bound inventory when it exceeds that viewport.</p>
             </Step>
           </div>
 
@@ -633,10 +634,11 @@ screen.on("save_settings", (id, screen, value) -> {
 
           <div className="grid sm:grid-cols-2 gap-3 mb-8 text-sm">
             {[
-              { prop: "cols", desc: "Number of slot columns" },
-              { prop: "rows", desc: "Visible row count in the designer (viewport)" },
-              { prop: "slot_size", desc: "Pixel size per slot (default 18 — vanilla MC)" },
+              { prop: "cols", desc: "Number of slot columns; determines width with slot_size" },
+              { prop: "rows", desc: "Visible row count; determines height with slot_size" },
+              { prop: "slot_size", desc: "Pixel size per slot (default 18 — vanilla MC); W = cols × slot_size, H = rows × slot_size" },
               { prop: "source", desc: "empty = custom, player = player inventory, player_hotbar = hotbar" },
+              { prop: "slot_hints", desc: "Optional empty-slot silhouettes: helmet, chestplate, leggings, boots, or shield/offhand" },
             ].map((r) => (
               <div key={r.prop} className="rounded-lg border p-3 flex gap-3">
                 <Code>{r.prop}</Code>
@@ -661,7 +663,8 @@ screen.on("save_settings", (id, screen, value) -> {
         "cols": 9,
         "slot_size": 18,
         "viewport_rows": 3,
-        "source": ""
+        "source": "",
+        "slot_hints": { "0": "helmet", "1": "chestplate", "2": "leggings", "3": "boots", "8": "shield" }
       }
     ]
   }

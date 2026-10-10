@@ -13,7 +13,8 @@ import { ScrollbarTry, SCROLLBAR_FIXED_PX } from "@/components/widgets/scrollbar
 import { InventoryAreaTry } from "@/components/widgets/inventory_area/InventoryAreaTry";
 import { TextureCtx, ScrollCtx, type ScrollPos, type ScrollCtxVal } from "@/components/widgets/tryContext";
 import WIDGET_REGISTRY from "@/lib/widgetRegistry";
-import { SELECTION_COLOR, SELECTION_OUTLINE } from "@/lib/selectionStyle";
+import { MULTI_SELECTION_COLOR, SELECTION_COLOR, SELECTION_OUTLINE } from "@/lib/selectionStyle";
+import { getInventoryAreaSize } from "@/lib/inventoryAreaSize";
 import { useTextures } from "@/lib/TextureContext";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AddWidgetItems } from "@/components/AddWidgetItems";
@@ -66,6 +67,12 @@ const RESIZE_HANDLE_STYLES: Record<string, React.CSSProperties> = {
   bottomLeft:  { display: "flex", alignItems: "center", justifyContent: "center", width: SIDE_HANDLE_SIZE, height: SIDE_HANDLE_SIZE, bottom: -SIDE_HANDLE_SIZE / 2, left: -SIDE_HANDLE_SIZE / 2 },
   bottomRight: { display: "flex", alignItems: "center", justifyContent: "center", width: SIDE_HANDLE_SIZE, height: SIDE_HANDLE_SIZE, bottom: -SIDE_HANDLE_SIZE / 2, right: -SIDE_HANDLE_SIZE / 2 },
 };
+const RESIZE_HANDLE_CLASSES: Record<string, string> = {
+  top: "canvas-resize-handle", bottom: "canvas-resize-handle",
+  left: "canvas-resize-handle", right: "canvas-resize-handle",
+  topLeft: "canvas-resize-handle", topRight: "canvas-resize-handle",
+  bottomLeft: "canvas-resize-handle", bottomRight: "canvas-resize-handle",
+};
 interface Props {
   width: number;
   height: number;
@@ -80,6 +87,7 @@ interface Props {
   tryMode: boolean;
   bindingsSchema: BindingsSchema;
   onSelect: (id: string | null) => void;
+  onSelectSingle: (id: string | null) => void;
   onToggleSelect: (id: string) => void;
   onUpdateWidget: (widget: WidgetSpec) => void;
   onUpdateWidgets: (widgets: WidgetSpec[]) => void;
@@ -110,7 +118,7 @@ function applyBindingPreviews(widget: WidgetSpec, schema: BindingsSchema): { wid
 }
 
 export default function Canvas({
-  width, height, scale, widgets, selectedId, selectedIds, gridSize, showGrid, snapToParent, snapToSiblings, tryMode, bindingsSchema, onSelect, onToggleSelect, onUpdateWidget, onUpdateWidgets, onAddWidget,
+  width, height, scale, widgets, selectedId, selectedIds, gridSize, showGrid, snapToParent, snapToSiblings, tryMode, bindingsSchema, onSelect, onSelectSingle, onToggleSelect, onUpdateWidget, onUpdateWidgets, onAddWidget,
 }: Props) {
   const cssWidth = width * scale;
   const cssHeight = height * scale;
@@ -187,58 +195,10 @@ export default function Canvas({
 
   const getWidget = (id: string) => widgets.find(w => w.id === id);
 
-  const resolveChain = (id: string): string[] => {
-    const chain: string[] = [];
-    let cur: string | undefined = id;
-    while (cur) {
-      chain.unshift(cur);
-      cur = getWidget(cur)?.parentId;
-    }
-    return chain;
-  };
-
-  // `tab` widgets are transparent in the selection cycle — their content is
-  // treated as being at the same level as the tabs container. They can still
-  // be selected by clicking directly on the tab header button (in which case
-  // clickedId IS the tab and it stays in the chain).
-  const selectionChain = (clickedId: string): string[] =>
-    resolveChain(clickedId).filter(id =>
-      id === clickedId || getWidget(id)?.type !== "tab"
-    );
-
-  // Plain click: drill one level deeper into the ancestor chain each click
-  // (a static click on nested widgets is inherently ambiguous about which
-  // level the user means, so successive clicks refine the target).
   const handleClickWidget = (clickedId: string) => {
-    // If a tab is already selected and the user clicks a sibling tab, jump
-    // directly to that tab without restarting the drill-down cycle.
-    if (selectedId !== null) {
-      const selected = getWidget(selectedId);
-      const clicked = getWidget(clickedId);
-      if (selected?.type === "tab" && clicked?.type === "tab" && selectedId !== clickedId && selected.parentId === clicked.parentId) {
-        selectionChangedRef.current = true;
-        onSelect(clickedId);
-        return;
-      }
-    }
-    const chain = selectionChain(clickedId);
-    const idx = selectedId !== null ? chain.indexOf(selectedId) : -1;
-    // Already at the deepest element in the chain — clicking it again does nothing.
-    // This ensures double-clicking a selected widget doesn't cycle away before dblclick fires.
-    if (idx === chain.length - 1) return;
-    selectionChangedRef.current = true;
-    onSelect(idx >= 0 ? chain[idx + 1] : chain[0]);
-  };
-
-  // Drag target resolution is deliberately different from click's drill-down:
-  // an actual drag gesture should move whatever is CURRENTLY selected if it's
-  // an ancestor (or itself) of the clicked widget, otherwise the outermost
-  // root container — never drilling deeper than the existing selection.
-  // E.g. dragging an unselected button moves its root panel; dragging that
-  // same button while its containing group is selected moves the group.
-  const resolveDragTargetId = (clickedId: string): string => {
-    const chain = selectionChain(clickedId);
-    return selectedId !== null && chain.includes(selectedId) ? selectedId : chain[0];
+    const changed = selectedId !== clickedId || selectedIds.length > 1;
+    selectionChangedRef.current = changed;
+    onSelectSingle(clickedId);
   };
 
   // All dragging is driven from a single listener here rather than from each
@@ -258,11 +218,14 @@ export default function Canvas({
     setCtxMenu({ x, y });
   };
 
-  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     if (tryMode) return;
     if (e.button !== 0) return; // ignore right/middle click — right-click is handled by contextmenu
+    const eventTarget = e.target as HTMLElement;
+    // Resize handles are driven by react-rnd and must not also start a move.
+    if (eventTarget.closest(".canvas-resize-handle")) return;
     // Commit any active inline text edit. e.preventDefault() below suppresses the normal
-    // focus-transfer that would blur the input automatically, so we do it explicitly.
+    // focus-transfer that would blur the input automatically, so do it explicitly.
     if (document.activeElement instanceof HTMLInputElement) document.activeElement.blur();
     e.preventDefault(); // prevent native browser image/text drag hijacking mouse events
     setCtxMenu(null);
@@ -271,9 +234,19 @@ export default function Canvas({
     const gap = now - lastMousedownTimeRef.current;
     if (gap > 250) { selectionChangedRef.current = false; }
     lastMousedownTimeRef.current = now;
-    const el = (e.target as HTMLElement).closest("[data-widget-id]");
-    if (!el) { onSelect(null); return; }
+    const el = eventTarget.closest("[data-widget-id]");
+    if (!el) { onSelectSingle(null); return; }
     const clickedId = el.getAttribute("data-widget-id")!;
+
+    // When a group is selected from the layers tree, dragging any visible
+    // descendant should move that group. Keep the actual clicked ID for a
+    // simple click, so users can still select the child itself without moving.
+    const selectedGroupId = selectedId && getWidget(selectedId)?.type === "group" ? selectedId : null;
+    let ancestorId = getWidget(clickedId)?.parentId;
+    while (ancestorId && ancestorId !== selectedGroupId) {
+      ancestorId = getWidget(ancestorId)?.parentId;
+    }
+    const dragSelectedGroup = !!selectedGroupId && (clickedId === selectedGroupId || ancestorId === selectedGroupId);
 
     // Cmd/Ctrl-click: add/remove exactly the widget under the cursor from the
     // multi-selection instead of starting a drag. Deliberately does NOT use
@@ -287,58 +260,90 @@ export default function Canvas({
     }
 
     // Selection depends on whether this gesture turns out to be a plain
-    // click or an actual drag — decided once, below, never both, to avoid
-    // flashing one selection before the other overrides it.
-    // Clicking directly on a member of the active multi-selection drags the
-    // whole group, bypassing the single-widget ancestor-resolution below
-    // (which has no notion of "drag everyone else currently selected too").
-    const isGroupMemberClick = selectedIds.length > 1 && selectedIds.includes(clickedId);
-    const targetId = isGroupMemberClick ? clickedId : resolveDragTargetId(clickedId);
+    // click or an actual drag. Dragging a selected member moves the full set.
+    const targetId = dragSelectedGroup ? selectedGroupId! : clickedId;
+    const isGroupMemberClick = selectedIds.length > 1 && selectedIds.includes(targetId);
     const target = getWidget(targetId);
     if (!target) return;
     const groupMembers = isGroupMemberClick ? widgets.filter(w => selectedIds.includes(w.id)) : [target];
-    const isGroupDrag = groupMembers.length > 1;
+    const selectedSet = new Set(groupMembers.map(w => w.id));
+    // A selected descendant follows its selected ancestor; only move the
+    // ancestor or the child would receive the same offset twice.
+    const moveMembers = groupMembers.filter(w => {
+      let parentId = w.parentId;
+      while (parentId) {
+        if (selectedSet.has(parentId)) return false;
+        parentId = widgets.find(parent => parent.id === parentId)?.parentId;
+      }
+      return true;
+    });
+    const isGroupDrag = isGroupMemberClick && groupMembers.length > 1;
+    const sameParent = moveMembers.every(w => w.parentId === moveMembers[0]?.parentId);
+    const moveRects = new Map(moveMembers.map((w) => {
+      const content = w.type === "group" ? getGroupContentBounds(w.id, widgets) : null;
+      return [w.id, content
+        ? { x: w.x + content.left, y: w.y + content.top, w: content.width, h: content.height }
+        : { x: w.x, y: w.y, w: w.w, h: w.h }] as const;
+    }));
 
     // Tab header buttons manage their own drag (move/resize). Canvas must not
     // move the widget, but should still handle click drill-down selection.
-    const inTabHeader = !!(e.target as HTMLElement).closest("[data-tab-header]");
+    const inTabHeader = !!eventTarget.closest("[data-tab-header]");
 
     const startClientX = e.clientX;
     const startClientY = e.clientY;
-    // The dragged extent: the group's combined bounding box, or just the
-    // single widget's own box — all the snap/bounds math below treats this
-    // like one widget being moved.
-    const bboxX = Math.min(...groupMembers.map(w => w.x));
-    const bboxY = Math.min(...groupMembers.map(w => w.y));
-    const bboxW = Math.max(...groupMembers.map(w => w.x + w.w)) - bboxX;
-    const bboxH = Math.max(...groupMembers.map(w => w.y + w.h)) - bboxY;
+    // Alignment uses one shared coordinate space. Cross-container selections
+    // still move by a shared delta but skip alignment guides.
+    const bboxX = sameParent ? Math.min(...moveMembers.map(w => moveRects.get(w.id)!.x)) : moveRects.get(moveMembers[0].id)!.x;
+    const bboxY = sameParent ? Math.min(...moveMembers.map(w => moveRects.get(w.id)!.y)) : moveRects.get(moveMembers[0].id)!.y;
+    const bboxW = sameParent
+      ? Math.max(...moveMembers.map(w => moveRects.get(w.id)!.x + moveRects.get(w.id)!.w)) - bboxX
+      : moveRects.get(moveMembers[0].id)!.w;
+    const bboxH = sameParent
+      ? Math.max(...moveMembers.map(w => moveRects.get(w.id)!.y + moveRects.get(w.id)!.h)) - bboxY
+      : moveRects.get(moveMembers[0].id)!.h;
     let moved = false;
 
     const snapToGrid = (v: number) => Math.round(v / snapPx) * snapPx;
-    const dragBounds = computeDragBounds({ ...target, x: bboxX, y: bboxY, w: bboxW, h: bboxH }, widgets, width, height);
-    const clamp = (nx: number, ny: number) => ({
-      x: Math.max(0, Math.min(dragBounds.maxX, nx)),
-      y: Math.max(0, Math.min(dragBounds.maxY, ny)),
+    const snapBounds = sameParent
+      ? computeDragBounds({ ...moveMembers[0], x: bboxX, y: bboxY, w: bboxW, h: bboxH }, widgets, width, height)
+      : null;
+    const memberBounds = moveMembers.map((w) => {
+      const rect = moveRects.get(w.id)!;
+      return computeDragBounds({ ...w, x: rect.x, y: rect.y, w: rect.w, h: rect.h }, widgets, width, height);
+    });
+    const minDeltaX = Math.max(...moveMembers.map(w => -moveRects.get(w.id)!.x));
+    const minDeltaY = Math.max(...moveMembers.map(w => -moveRects.get(w.id)!.y));
+    const maxDeltaX = Math.min(...memberBounds.map((b, i) => b.maxX - moveRects.get(moveMembers[i].id)!.x));
+    const maxDeltaY = Math.min(...memberBounds.map((b, i) => b.maxY - moveRects.get(moveMembers[i].id)!.y));
+    const clamp = (dx: number, dy: number) => ({
+      dx: Math.max(minDeltaX, Math.min(maxDeltaX, dx)),
+      dy: Math.max(minDeltaY, Math.min(maxDeltaY, dy)),
     });
     // Center-snap: while dragging, a widget (or group) that lands close to
     // horizontally or vertically centered within its parent (or the canvas,
     // for roots) snaps exactly onto that center — independently per axis.
     // dragBounds.maxX/maxY is (container size - box size), so half of it
     // is exactly the x/y at which the box sits centered in its container.
-    const centerX = Math.round(dragBounds.maxX / 2);
-    const centerY = Math.round(dragBounds.maxY / 2);
+    const centerX = snapBounds ? Math.round(snapBounds.maxX / 2) : 0;
+    const centerY = snapBounds ? Math.round(snapBounds.maxY / 2) : 0;
     const SNAP_THRESHOLD_PX = 4;
     // Fixed coordinate of the shift-lock axis line — the box's own center on
     // whichever axis ends up pinned, which never moves during a locked drag.
     const shiftLineX = bboxX + bboxW / 2;
     const shiftLineY = bboxY + bboxH / 2;
-    const containerW = dragBounds.maxX + bboxW;
-    const containerH = dragBounds.maxY + bboxH;
+    const containerW = snapBounds ? snapBounds.maxX + bboxW : 0;
+    const containerH = snapBounds ? snapBounds.maxY + bboxH : 0;
     // Sibling alignment: snap to other widgets under the same parent (excluding
     // the dragged group itself), matching left/center/right edges (x) and
     // top/center/bottom edges (y) independently.
     const groupIds = new Set(groupMembers.map(w => w.id));
-    const siblings = snapToSiblings ? widgets.filter(w => w.parentId === target.parentId && !groupIds.has(w.id)) : [];
+    const siblings = sameParent && snapToSiblings
+      ? widgets.filter(w => w.parentId === moveMembers[0].parentId && !groupIds.has(w.id)).map((w) => {
+        const content = w.type === "group" ? getGroupContentBounds(w.id, widgets) : null;
+        return content ? { ...w, x: w.x + content.left, y: w.y + content.top, w: content.width, h: content.height } : w;
+      })
+      : [];
     // Shift: lock movement to whichever axis has moved further, keeping the
     // other axis pinned to its original value (as in most design tools).
     const resolveTarget = (ev: MouseEvent) => {
@@ -348,6 +353,12 @@ export default function Canvas({
       if (ev.shiftKey) {
         if (Math.abs(rawDx) >= Math.abs(rawDy)) { rawDy = 0; shiftAxis = "horizontal"; }
         else { rawDx = 0; shiftAxis = "vertical"; }
+      }
+      if (!sameParent) {
+        return {
+          dx: snapToGrid(rawDx / scale), dy: snapToGrid(rawDy / scale),
+          vCenter: false, hCenter: false, shiftAxis, siblingLines: [],
+        };
       }
       let nx = snapToGrid(bboxX + rawDx / scale);
       let ny = snapToGrid(bboxY + rawDy / scale);
@@ -361,14 +372,14 @@ export default function Canvas({
       if (xAlign) {
         nx = xAlign.value;
         siblingLines.push({ axis: "v", pos: xAlign.guidePos, from: xAlign.guideFrom, to: xAlign.guideTo });
-      } else if (snapToParent) {
+      } else if (snapToParent && snapBounds) {
         vCenter = Math.abs(nx - centerX) <= SNAP_THRESHOLD_PX;
         if (vCenter) nx = centerX;
       }
       if (yAlign) {
         ny = yAlign.value;
         siblingLines.push({ axis: "h", pos: yAlign.guidePos, from: yAlign.guideFrom, to: yAlign.guideTo });
-      } else if (snapToParent) {
+      } else if (snapToParent && snapBounds) {
         hCenter = Math.abs(ny - centerY) <= SNAP_THRESHOLD_PX;
         if (hCenter) ny = centerY;
       }
@@ -385,43 +396,45 @@ export default function Canvas({
       if (dx === 0 && dy === 0 && !shiftAxis) return;
       if (!moved) {
         moved = true;
-        // An actual drag unambiguously identifies its target.
-        onSelect(targetId);
+        // A plain drag starts a fresh selection; a selected-member drag keeps
+        // the full multi-selection active.
+        if (isGroupDrag) onSelect(targetId);
+        else onSelectSingle(targetId);
       }
-      const clamped = clamp(bboxX + dx, bboxY + dy);
+      const clamped = clamp(dx, dy);
       if (isGroupDrag) {
-        setGroupDrag({ ids: groupMembers.map(w => w.id), dx: clamped.x - bboxX, dy: clamped.y - bboxY });
+        setGroupDrag({ ids: moveMembers.map(w => w.id), dx: clamped.dx, dy: clamped.dy });
       } else {
-        setDraggingPos({ id: targetId, ...clamped });
+        setDraggingPos({ id: targetId, x: target.x + clamped.dx, y: target.y + clamped.dy });
       }
-      setDragGuides({
-        parentId: target.parentId ?? null,
+      setDragGuides(sameParent ? {
+        parentId: moveMembers[0].parentId ?? null,
         containerW, containerH,
         vCenter, hCenter, shiftAxis,
         shiftX: shiftLineX, shiftY: shiftLineY,
         siblingLines,
-      });
+      } : null);
     };
     const onUp = (ev: MouseEvent) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       if (moved && !inTabHeader) {
         const { dx, dy } = resolveTarget(ev);
-        const clamped = clamp(bboxX + dx, bboxY + dy);
+        const clamped = clamp(dx, dy);
         if (isGroupDrag) {
-          const finalDx = clamped.x - bboxX;
-          const finalDy = clamped.y - bboxY;
-          onUpdateWidgets(groupMembers.map(w => ({ ...w, x: w.x + finalDx, y: w.y + finalDy })));
+          onUpdateWidgets(moveMembers.map(w => ({ ...w, x: w.x + clamped.dx, y: w.y + clamped.dy })));
         } else {
-          onUpdateWidget({ ...target, ...clamped });
+          onUpdateWidget({ ...target, x: target.x + clamped.dx, y: target.y + clamped.dy });
         }
       } else if (!moved) {
         if (inTabHeader) {
           // Tab header buttons map 1:1 to tab widgets — select directly, no drill-down.
           selectionChangedRef.current = true;
-          onSelect(clickedId);
+          onSelectSingle(clickedId);
+        } else if (e.shiftKey) {
+          onToggleSelect(clickedId);
         } else {
-          // No movement — plain click: apply ambiguous-click drill-down.
+          // A plain click selects the widget under the pointer and clears the old set.
           handleClickWidget(clickedId);
         }
       }
@@ -478,7 +491,7 @@ export default function Canvas({
         )}
 
         {dragGuides && dragGuides.parentId === null && <GuideLines {...dragGuides} />}
-        {!tryMode && <GroupSelectionOverlay widgets={rootWidgets} selectedIds={selectedIds} groupDrag={groupDrag} />}
+        {!tryMode && <GroupSelectionOverlay canvasRef={canvasRef} selectedIds={selectedIds} scale={scale} groupDrag={groupDrag} />}
 
         <SelectionChangedCtx.Provider value={selectionChangedRef}>
         <ActiveTabCtx.Provider value={React.useMemo(() => ({ activeTabIds, setActiveTab }), [activeTabIds, setActiveTab])}>
@@ -547,6 +560,38 @@ function buildChildMap(widgets: WidgetSpec[]): Map<string, WidgetSpec[]> {
 
 // ── Edit mode widget ──────────────────────────────────────────────────────────
 
+function getGroupContentBounds(groupId: string, widgets: WidgetSpec[]) {
+  const childrenByParent = new Map<string, WidgetSpec[]>();
+  for (const widget of widgets) {
+    if (!widget.parentId) continue;
+    const siblings = childrenByParent.get(widget.parentId) ?? [];
+    siblings.push(widget);
+    childrenByParent.set(widget.parentId, siblings);
+  }
+
+  const boxes: Array<{ x: number; y: number; right: number; bottom: number }> = [];
+  const visit = (parentId: string, parentX: number, parentY: number) => {
+    for (const child of childrenByParent.get(parentId) ?? []) {
+      if (child.hidden) continue;
+      const x = parentX + child.x;
+      const y = parentY + child.y;
+      if (child.type !== "group") {
+        const size = child.type === "inventory_area" ? getInventoryAreaSize(child.props) : child;
+        boxes.push({ x, y, right: x + size.w, bottom: y + size.h });
+      }
+      visit(child.id, x, y);
+    }
+  };
+  visit(groupId, 0, 0);
+  if (boxes.length === 0) return null;
+
+  const left = Math.min(...boxes.map((box) => box.x));
+  const top = Math.min(...boxes.map((box) => box.y));
+  const right = Math.max(...boxes.map((box) => box.right));
+  const bottom = Math.max(...boxes.map((box) => box.bottom));
+  return { left, top, width: right - left, height: bottom - top };
+}
+
 function EditWidget({ widget, scale, selectedId, selectedIds, snapPx, draggingPos, draggingSize, setDraggingSize, dragGuides, groupDrag, onResizeCommit, childMap, zBase }: {
   widget: WidgetSpec;
   scale: number;
@@ -576,6 +621,9 @@ function EditWidget({ widget, scale, selectedId, selectedIds, snapPx, draggingPo
   const children = isContainer ? (childMap.get(widget.id) ?? []) : [];
   const clips = false;
   const isGroup = widget.type === "group";
+  const groupContentBounds = isGroup && (isSelected || isGroupMember)
+    ? getGroupContentBounds(widget.id, allWidgets)
+    : null;
   const isTabs = widget.type === "tabs";
 
   // Preview-only: which of this `tabs` widget's `tab` children is shown on the canvas right now.
@@ -704,12 +752,13 @@ function EditWidget({ widget, scale, selectedId, selectedIds, snapPx, draggingPo
   const liveY = draggingPos?.id === widget.id ? draggingPos.y : draggingSize?.id === widget.id ? draggingSize.y : groupDrag?.ids.includes(widget.id) ? widget.y + groupDrag.dy : widget.y;
 
   // ...or, for groups, one of its children may be, which changes auto-size.
+  const inventoryAreaSize = widget.type === "inventory_area" ? getInventoryAreaSize(widget.props) : null;
   const renderW = isGroup && children.length > 0
-    ? Math.max(...children.map(c => (draggingPos?.id === c.id ? draggingPos.x : c.x) + c.w))
-    : draggingSize?.id === widget.id ? draggingSize.w : widget.w;
+    ? Math.max(...children.map(c => (draggingPos?.id === c.id ? draggingPos.x : c.x) + (c.type === "inventory_area" ? getInventoryAreaSize(c.props).w : c.w)))
+    : inventoryAreaSize?.w ?? (draggingSize?.id === widget.id ? draggingSize.w : widget.w);
   const renderH = isGroup && children.length > 0
-    ? Math.max(...children.map(c => (draggingPos?.id === c.id ? draggingPos.y : c.y) + c.h))
-    : draggingSize?.id === widget.id ? draggingSize.h : widget.h;
+    ? Math.max(...children.map(c => (draggingPos?.id === c.id ? draggingPos.y : c.y) + (c.type === "inventory_area" ? getInventoryAreaSize(c.props).h : c.h)))
+    : inventoryAreaSize?.h ?? (draggingSize?.id === widget.id ? draggingSize.h : widget.h);
 
   const resizeBounds = computeResizeBounds(widget, allWidgets);
 
@@ -876,13 +925,23 @@ function EditWidget({ widget, scale, selectedId, selectedIds, snapPx, draggingPo
         setInlineEdit({ id: widget.id, text: widget.text });
       }}
       style={{
-        outline: isSelected && !isGroup ? SELECTION_OUTLINE : "none",
+        outline: isGroup
+          ? (!groupContentBounds && (isSelected || isGroupMember)
+            ? isGroupMember ? `2px dashed ${MULTI_SELECTION_COLOR}` : SELECTION_OUTLINE
+            : "none")
+          : isGroupMember
+            ? `2px dashed ${MULTI_SELECTION_COLOR}`
+            : isSelected ? SELECTION_OUTLINE : "none",
         outlineOffset: 1,
         zIndex: zBase,
+        // Groups have no visible surface. Let clicks pass through their empty
+        // auto-sized wrapper to the actual widget underneath; child widgets
+        // explicitly opt back into pointer events below.
+        pointerEvents: isGroup ? "none" : "auto",
         cursor: "move",
         opacity: hidden ? 0.25 : 1,
       }}
-      enableResizing={isSelected && !isGroup && widget.type !== "scrollbar"
+      enableResizing={isSelected && !isGroup && widget.type !== "scrollbar" && widget.type !== "inventory_area"
         ? true
         : isSelected && widget.type === "scrollbar"
           ? (widget.props.axis ?? "y") === "y"
@@ -891,9 +950,26 @@ function EditWidget({ widget, scale, selectedId, selectedIds, snapPx, draggingPo
           : false
       }
       resizeHandleStyles={isSelected ? RESIZE_HANDLE_STYLES : undefined}
+      resizeHandleClasses={isSelected ? RESIZE_HANDLE_CLASSES : undefined}
       resizeHandleComponent={isSelected ? resizeHandleComponent : undefined}
     >
       {!isTabs && <WidgetVisual widget={draggingSize?.id === widget.id ? { ...previewWidget, w: draggingSize.w, h: draggingSize.h } : previewWidget} scale={scale} interactState="idle" />}
+      {groupContentBounds && (
+        <div
+          data-export-ignore
+          style={{
+            position: "absolute",
+            left: groupContentBounds.left,
+            top: groupContentBounds.top,
+            width: groupContentBounds.width,
+            height: groupContentBounds.height,
+            outline: isGroupMember ? `2px dashed ${MULTI_SELECTION_COLOR}` : SELECTION_OUTLINE,
+            outlineOffset: 1,
+            pointerEvents: "none",
+            zIndex: 900,
+          }}
+        />
+      )}
       {inlineEdit?.id === widget.id && (() => {
         // Mirror WidgetVisual's text alignment and padding so the edit position matches display.
         const align = widget.type === "label"
@@ -935,7 +1011,6 @@ function EditWidget({ widget, scale, selectedId, selectedIds, snapPx, draggingPo
           overflow: clips ? "hidden" : "visible",
         }}>
           {dragGuides && dragGuides.parentId === widget.id && <GuideLines {...dragGuides} />}
-          <GroupSelectionOverlay widgets={children} selectedIds={selectedIds} groupDrag={groupDrag} />
           {children.map((child, idx) => (
             <EditWidget
               key={child.id}

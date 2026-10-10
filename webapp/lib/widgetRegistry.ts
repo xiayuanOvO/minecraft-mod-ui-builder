@@ -179,6 +179,31 @@ const WIDGET_REGISTRY: WidgetDef[] = [
       { key: "show_label", label: "Show %", type: "boolean", defaultValue: "true" },
     ],
   },
+  ...([
+    { type: "health_bar", label: "Health Bar", value: "16", max: "20" },
+    { type: "hunger_bar", label: "Hunger Bar", value: "14", max: "20" },
+    { type: "armor_bar", label: "Armor Bar", value: "12", max: "20" },
+    { type: "air_bar", label: "Air Bar", value: "240", max: "300" },
+    { type: "experience_bar", label: "Experience Bar", value: "35", max: "100" },
+  ] as const).map(({ type, label, value, max }): WidgetDef => ({
+    type,
+    label,
+    defaultWidget: {
+      type,
+      x: 8,
+      y: 8,
+      w: type === "experience_bar" ? 182 : 81,
+      h: type === "experience_bar" ? 5 : 9,
+      text: "",
+      icon: null,
+      props: { value, max, ...(type === "air_bar" ? { count: "10" } : {}) },
+    },
+    propSchema: [
+      { key: "value", label: "Value", type: "number", defaultValue: value },
+      { key: "max", label: "Max Value", type: "number", defaultValue: max },
+      ...(type === "air_bar" ? [{ key: "count", label: "Bubble Count", type: "number" as const, defaultValue: "10" }] : []),
+    ],
+  })),
   {
     type: "requirement",
     label: "Requirement",

@@ -11,6 +11,7 @@ import GroupVisual from "./group/GroupVisual";
 import ListVisual from "./list/ListVisual";
 import SpriteVisual from "./sprite/SpriteVisual";
 import ProgressVisual from "./progress/ProgressVisual";
+import SurvivalBarVisual from "./progress/SurvivalBarVisual";
 import InventoryAreaVisual from "./inventory_area/InventoryAreaVisual";
 import PlayerPreviewVisual from "./player_preview/PlayerPreviewVisual";
 import ScrollbarWidgetVisual from "./scrollbar/ScrollbarVisual";
@@ -29,6 +30,11 @@ export const WIDGET_VISUAL_REGISTRY: Record<string, ComponentType<VisualProps>> 
   list: ListVisual,
   sprite: SpriteVisual,
   progress: ProgressVisual,
+  health_bar: SurvivalBarVisual,
+  hunger_bar: SurvivalBarVisual,
+  armor_bar: SurvivalBarVisual,
+  air_bar: SurvivalBarVisual,
+  experience_bar: SurvivalBarVisual,
   inventory_area: InventoryAreaVisual,
   player_preview: PlayerPreviewVisual,
   scrollbar: ScrollbarWidgetVisual,

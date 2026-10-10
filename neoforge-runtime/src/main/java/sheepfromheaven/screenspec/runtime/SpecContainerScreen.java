@@ -316,6 +316,7 @@ public class SpecContainerScreen<T extends AbstractContainerMenu> extends Abstra
             if (w.type.equals("panel"))          renderPanel(graphics, w);
             else if (w.type.equals("sprite"))    renderSprite(graphics, w);
             else if (w.type.equals("progress"))  renderProgress(graphics, w);
+            else if (isSurvivalBar(w))            renderSurvivalBar(graphics, w);
             else if (w.type.equals("custom"))    renderCustom(graphics, w);
         }
         for (WidgetSpec w : builder().visibleWidgets()) {
@@ -420,6 +421,17 @@ public class SpecContainerScreen<T extends AbstractContainerMenu> extends Abstra
     protected void renderProgress(GuiGraphicsExtractor graphics, WidgetSpec w) {
         int[] o = builder().originOf(w);
         renderer.renderProgress(new McDrawContext(graphics), this.font, w, o[0], o[1]);
+    }
+
+    private static boolean isSurvivalBar(WidgetSpec w) {
+        return w.type.equals("health_bar") || w.type.equals("hunger_bar")
+            || w.type.equals("armor_bar") || w.type.equals("air_bar")
+            || w.type.equals("experience_bar");
+    }
+
+    protected void renderSurvivalBar(GuiGraphicsExtractor graphics, WidgetSpec w) {
+        int[] o = builder().originOf(w);
+        renderer.renderSurvivalBar(new McDrawContext(graphics), w, o[0], o[1]);
     }
 
     protected void renderLabel(GuiGraphicsExtractor graphics, WidgetSpec w) {

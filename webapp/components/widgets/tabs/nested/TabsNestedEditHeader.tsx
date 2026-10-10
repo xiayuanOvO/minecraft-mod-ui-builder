@@ -6,7 +6,7 @@ import { NESTED_TAB_SLICE, NESTED_TAB_GAP, computeTabLayout, reflowTabsForWidth 
 import { SelectionOverlay } from "@/components/SelectionOverlay";
 import { TabBackground, TabLabel } from "../TabParts";
 import { GuideLines, type DragGuidesInfo } from "@/components/DragGuides";
-import { GroupSelectionOverlay, type GroupDragInfo } from "@/components/GroupSelectionOverlay";
+import type { GroupDragInfo } from "@/components/GroupSelectionOverlay";
 
 interface EditWidgetProps {
   widget: WidgetSpec;
@@ -126,7 +126,6 @@ export function TabsNestedEditHeader({
         overflow: "hidden", zIndex: 1,
       }}>
         {dragGuides && dragGuides.parentId === activeTabId && <GuideLines {...dragGuides} />}
-        <GroupSelectionOverlay widgets={activeTabChildren} selectedIds={selectedIds} groupDrag={groupDrag} />
         {!tabChildren.find(t => t.id === activeTabId)?.hidden && activeTabChildren.map((child, idx) => (
           <EditWidget key={child.id} widget={child} scale={scale} selectedId={selectedId} selectedIds={selectedIds}
             snapPx={snapPx} draggingPos={draggingPos} draggingSize={draggingSize}

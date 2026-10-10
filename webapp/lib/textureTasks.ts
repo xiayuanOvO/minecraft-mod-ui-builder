@@ -1,6 +1,6 @@
 // Shared texture-processing helpers and task definitions, used by both
 // extractFromPack.ts (upload a JAR/resource pack ZIP) and
-// extractFromGithub.ts (fetch individual files from a GitHub raw URL).
+// extractFromLocal.ts (fetch individual files from the bundled local assets).
 // Keeping the slicing/cropping math in one place means both loading paths
 // produce byte-identical results — no drift between "uploaded" and
 // "auto-loaded" textures.
@@ -70,6 +70,15 @@ export const CHECKBOX_SPRITES: { name: string; path: string }[] = [
   { name: "mc_checkbox_selected.png",             path: "assets/minecraft/textures/gui/sprites/widget/checkbox_selected.png" },
   { name: "mc_checkbox_highlighted.png",          path: "assets/minecraft/textures/gui/sprites/widget/checkbox_highlighted.png" },
   { name: "mc_checkbox_selected_highlighted.png", path: "assets/minecraft/textures/gui/sprites/widget/checkbox_selected_highlighted.png" },
+];
+
+// Vanilla's empty inventory-slot silhouettes from the 26.3 GUI sprite atlas.
+export const SLOT_HINT_SPRITES: { name: string; path: string }[] = [
+  { name: "mc_slot_hint_helmet.png", path: "assets/minecraft/textures/gui/sprites/container/slot/helmet.png" },
+  { name: "mc_slot_hint_chestplate.png", path: "assets/minecraft/textures/gui/sprites/container/slot/chestplate.png" },
+  { name: "mc_slot_hint_leggings.png", path: "assets/minecraft/textures/gui/sprites/container/slot/leggings.png" },
+  { name: "mc_slot_hint_boots.png", path: "assets/minecraft/textures/gui/sprites/container/slot/boots.png" },
+  { name: "mc_slot_hint_shield.png", path: "assets/minecraft/textures/gui/sprites/container/slot/shield.png" },
 ];
 
 // Tab sprites from the advancements sprite sheet (28×32) — proper left/middle/right for both states

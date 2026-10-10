@@ -6,7 +6,7 @@ import { TAB_TOP_SLICE, TAB_SIDE_SLICE, TAB_LEFT_SLICE, TAB_GAP, computeTabLayou
 import { SelectionOverlay } from "@/components/SelectionOverlay";
 import { TabBackground, TabLabel } from "../TabParts";
 import { GuideLines, type DragGuidesInfo } from "@/components/DragGuides";
-import { GroupSelectionOverlay, type GroupDragInfo } from "@/components/GroupSelectionOverlay";
+import type { GroupDragInfo } from "@/components/GroupSelectionOverlay";
 
 export type { TabDrag };
 
@@ -182,7 +182,6 @@ export function TabsTopEditHeader({
             borderImage: `url("${tex("mc_panel_slice.png")}") 3 fill / 3px stretch` }} />
         )}
         {dragGuides && dragGuides.parentId === activeTabId && <GuideLines {...dragGuides} />}
-        <GroupSelectionOverlay widgets={activeTabChildren} selectedIds={selectedIds} groupDrag={groupDrag} />
         {!tabChildren.find(t => t.id === activeTabId)?.hidden && activeTabChildren.map((child, idx) => (
           <EditWidget key={child.id} widget={child} scale={scale} selectedId={selectedId} selectedIds={selectedIds}
             snapPx={snapPx} draggingPos={draggingPos} draggingSize={draggingSize}

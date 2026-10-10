@@ -250,6 +250,7 @@ public class SpecScreen extends Screen implements ActionHost {
             if (w.type.equals("panel"))          renderPanel(graphics, w);
             else if (w.type.equals("sprite"))    renderSprite(graphics, w);
             else if (w.type.equals("progress"))  renderProgress(graphics, w);
+            else if (isSurvivalBar(w))            renderSurvivalBar(graphics, w);
             else if (w.type.equals("custom"))    renderCustom(graphics, w);
             else if (w.type.equals("player_preview")) {
                 int[] origin = builder().originOf(w);
@@ -333,6 +334,17 @@ public class SpecScreen extends Screen implements ActionHost {
     protected void renderProgress(GuiGraphicsExtractor graphics, WidgetSpec w) {
         int[] origin = builder().originOf(w);
         renderer.renderProgress(new McDrawContext(graphics), this.font, w, origin[0], origin[1]);
+    }
+
+    private static boolean isSurvivalBar(WidgetSpec w) {
+        return w.type.equals("health_bar") || w.type.equals("hunger_bar")
+            || w.type.equals("armor_bar") || w.type.equals("air_bar")
+            || w.type.equals("experience_bar");
+    }
+
+    protected void renderSurvivalBar(GuiGraphicsExtractor graphics, WidgetSpec w) {
+        int[] origin = builder().originOf(w);
+        renderer.renderSurvivalBar(new McDrawContext(graphics), w, origin[0], origin[1]);
     }
 
     /**

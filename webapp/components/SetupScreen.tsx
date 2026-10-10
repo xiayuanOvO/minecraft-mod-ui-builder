@@ -8,10 +8,8 @@ import LanguageToggle from "@/components/LanguageToggle";
 import { useLocale } from "@/lib/i18n";
 
 /**
- * Fallback screen — only shown when the automatic texture load (straight
- * from GitHub's raw CDN, see lib/extractFromGithub.ts) didn't fully succeed,
- * e.g. no network, GitHub unreachable, or a corporate proxy blocking it.
- * Lets you retry that, or load your own JAR/resource pack instead.
+ * Fallback screen — shown when local Minecraft textures are unavailable.
+ * Lets the user load a local JAR or resource pack instead.
  */
 export default function SetupScreen() {
   const { t } = useLocale();
@@ -54,7 +52,7 @@ export default function SetupScreen() {
       <div className="text-center">
         <h1 className="text-3xl font-bold tracking-tight">MC Screen Designer</h1>
         <p className="mt-2 text-sm text-muted-foreground max-w-sm">
-          {t("Couldn’t automatically load the default textures (probably a network issue). Try again, or load your own game files instead — extracted locally, nothing leaves your browser.")}
+          {t("Couldn’t load local Minecraft textures. Try again, or load your own game files — extracted locally, nothing leaves your browser.")}
         </p>
       </div>
 
@@ -62,7 +60,7 @@ export default function SetupScreen() {
         <Button onClick={handleRetry} disabled={retrying} variant="secondary" className="w-full">
           {retrying
             ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("Retrying…")}</>
-            : <><RefreshCw className="mr-2 h-4 w-4" />{t("Try loading default textures again")}</>}
+            : <><RefreshCw className="mr-2 h-4 w-4" />{t("Load local textures again")}</>}
         </Button>
 
         <div className="rounded-lg border bg-card p-5 flex flex-col gap-3">
@@ -71,7 +69,7 @@ export default function SetupScreen() {
             <div>
               <p className="text-sm font-medium">{t("Load from Minecraft JAR or resource pack")}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {t("Select your ")}<code className="font-mono">1.21.x.jar</code>{t(" from your Minecraft install, or any ")}<code className="font-mono">.zip</code>{t(" resource pack.")}
+                {t("Select your ")}<code className="font-mono">Minecraft.jar</code>{t(" from your Minecraft install, or any ")}<code className="font-mono">.zip</code>{t(" resource pack.")}
               </p>
             </div>
           </div>

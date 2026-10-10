@@ -3,6 +3,8 @@
 import { useState, useCallback, useContext } from "react";
 import React from "react";
 import type { WidgetSpec } from "@/lib/types";
+import { getInventoryAreaMetrics } from "@/lib/inventoryAreaSize";
+import { parseSlotHints, slotHintTextureName } from "@/lib/slotHints";
 import { TextureCtx, ScrollCtx, type ScrollPos } from "../tryContext";
 
 /** Try-mode's scrollable inventory area — wheel scroll, built-in thumb drag, or driven by an external scrollbar widget. */
@@ -17,14 +19,11 @@ export function InventoryAreaTry({ widget, scale, zBase, externalScrollbarIdY, e
   const tex = (name: string) => (textures as Record<string, string>)[name];
   const scrollCtx = useContext(ScrollCtx);
 
-  const cols     = parseInt(widget.props.cols      ?? "9",  10);
-  const rows     = parseInt(widget.props.rows      ?? "3",  10);
-  // slotSize is in MC pixels (inner canvas is 1:1)
-  const slotSize = parseInt(widget.props.slot_size ?? "18", 10);
-  const fullW    = cols * slotSize;
-  const fullH    = rows * slotSize;
-  const viewW    = widget.w;
-  const viewH    = widget.h;
+  const { cols, rows, slotSize, w: fullW, h: fullH } = getInventoryAreaMetrics(widget.props);
+  const slotHints = parseSlotHints(widget.props.slot_hints);
+  // The viewport is defined by cols × rows, with one slot_size per cell.
+  const viewW = fullW;
+  const viewH = fullH;
 
   const maxScrollLeft = Math.max(0, fullW - viewW);
   const maxScrollTop  = Math.max(0, fullH - viewH);
@@ -121,7 +120,33 @@ export function InventoryAreaTry({ widget, scale, zBase, externalScrollbarIdY, e
           backgroundRepeat: "repeat",
           imageRendering: "pixelated",
           boxSizing: "border-box",
-        }} />
+        }}>
+          {Object.entries(slotHints).map(([rawIndex, hint]) => {
+            const index = Number(rawIndex);
+            if (index >= cols * rows) return null;
+            const hintTexture = tex(slotHintTextureName(hint));
+            if (!hintTexture) return null;
+            const hintSize = Math.max(1, Math.min(16, slotSize - 2));
+            return (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={rawIndex}
+                src={hintTexture}
+                alt=""
+                draggable={false}
+                style={{
+                  position: "absolute",
+                  left: (index % cols) * slotSize + (slotSize - hintSize) / 2,
+                  top: Math.floor(index / cols) * slotSize + (slotSize - hintSize) / 2,
+                  width: hintSize,
+                  height: hintSize,
+                  imageRendering: "pixelated",
+                  pointerEvents: "none",
+                }}
+              />
+            );
+          })}
+        </div>
       </div>
 
       {showBuiltinY && (

@@ -15,8 +15,9 @@ import type { ScreenSpec, WidgetSpec } from "@/lib/types";
 import { generateJavaClass } from "@/lib/generateJavaClass";
 import { getWidgetDef } from "@/lib/widgetRegistry";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { buildContainerSpec, excludeFromExportedWidgets } from "@/components/widgets/inventory_area/inventoryAreaExport";
+import { buildContainerSpec, excludeFromExportedWidgets, resolveAbsolutePos } from "@/components/widgets/inventory_area/inventoryAreaExport";
 import { computeInitialSize } from "@/lib/widgetBounds";
+import { getInventoryAreaSize, normalizeInventoryAreaSize } from "@/lib/inventoryAreaSize";
 import { APP_VERSION, migrateScreenJson, migrateProjectJson } from "@/lib/migrations";
 
 function newId(type: string, existing: WidgetSpec[]): string {
@@ -75,7 +76,10 @@ function migrateSession(raw: Record<string, unknown>): SavedSession {
 }
 
 function normalizeScreen(s: ScreenSpec): ScreenSpec {
-  return { ...s, widgets: s.widgets.map((w) => ({ ...w, props: w.props ?? {} })) };
+  return {
+    ...s,
+    widgets: s.widgets.map((w) => normalizeInventoryAreaSize({ ...w, props: w.props ?? {} })),
+  };
 }
 
 function loadProjects(): StoredProject[] {
@@ -84,10 +88,19 @@ function loadProjects(): StoredProject[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as StoredProject[];
     if (!Array.isArray(parsed)) return [];
-    return parsed.map(p => ({
-      ...p,
-      session: migrateSession(p.session as unknown as Record<string, unknown>),
-    }));
+    return parsed.map(p => {
+      const session = migrateSession(p.session as unknown as Record<string, unknown>);
+      return {
+        ...p,
+        session: {
+          ...session,
+          history: session.history.map(entry => ({
+            ...entry,
+            screens: entry.screens.map(normalizeScreen),
+          })),
+        },
+      };
+    });
   } catch {
     return [];
   }
@@ -132,6 +145,7 @@ export default function EditorPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [multiSelect, setMultiSelect] = useState<{ ids: string[] } | null>(null);
+  const [selectionAnchorId, setSelectionAnchorId] = useState<string | null>(null);
   const [gridSize, setGridSize] = useState(EMPTY_SESSION.gridSize);
   const [showGrid, setShowGrid] = useState(EMPTY_SESSION.showGrid);
   const [snapToParent, setSnapToParent] = useState(true);
@@ -253,9 +267,13 @@ export default function EditorPage() {
     ? multiSelect.ids
     : selectedId ? [selectedId] : [];
 
-  // Cmd/Ctrl-click (canvas or layers tree): add/remove one widget from the
-  // current multi-selection. Only allowed within the same parent as the
-  // existing selection — group drag/snap assumes all selected widgets are siblings.
+  const selectSingleWidget = useCallback((id: string | null) => {
+    setMultiSelect(null);
+    setSelectedId(id);
+    setSelectionAnchorId(id);
+  }, []);
+
+  // Cmd/Ctrl-click (canvas or layers tree): toggle one widget in the selection.
   const toggleSelectWidget = useCallback((id: string) => {
     const widget = screen.widgets.find((w) => w.id === id);
     if (!widget) return;
@@ -264,19 +282,11 @@ export default function EditorPage() {
       if (next.length <= 1) {
         setMultiSelect(null);
         setSelectedId(next[0] ?? null);
+        if (next.length === 0) setSelectionAnchorId(null);
       } else {
         setMultiSelect({ ids: next });
         if (!next.includes(selectedId!)) setSelectedId(next[0]);
       }
-      return;
-    }
-    const anchorParent = selectedIds.length > 0
-      ? screen.widgets.find((w) => w.id === selectedIds[0])?.parentId
-      : widget.parentId;
-    if (selectedIds.length > 0 && widget.parentId !== anchorParent) {
-      // Different parent than the current selection — start a fresh selection.
-      setMultiSelect(null);
-      setSelectedId(id);
       return;
     }
     setMultiSelect({ ids: [...selectedIds, id] });
@@ -288,8 +298,9 @@ export default function EditorPage() {
       toggleSelectWidget(id);
       return;
     }
-    if (shiftKey && selectedId) {
-      const anchor = screen.widgets.find((w) => w.id === selectedId);
+    if (shiftKey && (selectionAnchorId ?? selectedId)) {
+      const anchorId = selectionAnchorId ?? selectedId!;
+      const anchor = screen.widgets.find((w) => w.id === anchorId);
       const target = screen.widgets.find((w) => w.id === id);
       if (anchor && target && anchor.parentId === target.parentId) {
         const siblings = screen.widgets.filter((w) => w.parentId === anchor.parentId);
@@ -303,7 +314,8 @@ export default function EditorPage() {
     }
     setMultiSelect(null);
     setSelectedId(id);
-  }, [screen.widgets, selectedId, toggleSelectWidget]);
+    setSelectionAnchorId(id);
+  }, [screen.widgets, selectedId, selectionAnchorId, toggleSelectWidget]);
 
   const commit = useCallback((next: HistoryEntry) => {
     const c = cursorRef.current;
@@ -320,16 +332,18 @@ export default function EditorPage() {
     commit({ screens: screens.map((s, i) => i === activeIdx ? next : s), activeIdx });
   }, [screens, activeIdx, commit]);
 
-  const undo = useCallback(() => { setCursor((c) => Math.max(0, c - 1)); setSelectedId(null); }, []);
-  const redo = useCallback(() => { setCursor((c) => Math.min(history.length - 1, c + 1)); setSelectedId(null); }, [history.length]);
+  const undo = useCallback(() => { setCursor((c) => Math.max(0, c - 1)); selectSingleWidget(null); }, [selectSingleWidget]);
+  const redo = useCallback(() => { setCursor((c) => Math.min(history.length - 1, c + 1)); selectSingleWidget(null); }, [history.length, selectSingleWidget]);
 
   const updateWidget = useCallback((updated: WidgetSpec) => {
-    // Most callers (drag/resize/nudge) update a widget in place with its id unchanged, so
-    // matching on updated.id finds it. Renaming a widget's id (PropertyPanel's ID field) is the
-    // one case where updated.id is the new, not-yet-present id — fall back to selectedId then.
-    const matchId = screen.widgets.some((w) => w.id === updated.id) ? updated.id : selectedId;
-    commitScreen({ ...screen, widgets: screen.widgets.map((w) => (w.id === matchId ? updated : w)) });
-    if (updated.id !== selectedId) setSelectedId(updated.id);
+    const normalized = normalizeInventoryAreaSize(updated);
+    const target = screen.widgets.find((w) => w.id === normalized.id)
+      ?? screen.widgets.find((w) => w.id === selectedId);
+    if (!target) return;
+    commitScreen({
+      ...screen,
+      widgets: screen.widgets.map((widget) => widget.id === target.id ? normalized : widget),
+    });
   }, [screen, commitScreen, selectedId]);
 
   const toggleHiddenWidget = useCallback((id: string) => {
@@ -340,16 +354,36 @@ export default function EditorPage() {
 
   const renameWidget = useCallback((id: string, name: string) => {
     const widget = screen.widgets.find(w => w.id === id);
-    if (!widget) return;
-    updateWidget({ ...widget, id: name });
-  }, [screen, updateWidget]);
+    if (!widget || !name || name === id || screen.widgets.some((w) => w.id === name)) return;
+    commitScreen({
+      ...screen,
+      widgets: screen.widgets.map((current) => {
+        if (current.id === id) return { ...current, id: name };
+        return {
+          ...current,
+          ...(current.parentId === id ? { parentId: name } : {}),
+          ...(current.type === "scrollbar" && current.props.target === id
+            ? { props: { ...current.props, target: name } }
+            : {}),
+        };
+      }),
+    });
+    selectSingleWidget(name);
+  }, [screen, commitScreen, selectSingleWidget]);
 
-  const deleteWidget = useCallback((id = selectedId) => {
-    if (!id) return;
-    const target = screen.widgets.find(w => w.id === id);
-    if (target?.type === "tab" && target.parentId) {
-      const siblings = screen.widgets.filter(w => w.type === "tab" && w.parentId === target.parentId);
-      if (siblings.length <= 1) return;
+  const deleteWidget = useCallback((id?: string) => {
+    const rootIds = new Set(id ? [id] : selectedIds.length ? selectedIds : selectedId ? [selectedId] : []);
+    if (rootIds.size === 0) return;
+    const tabsParents = new Set(screen.widgets
+      .filter((w) => rootIds.has(w.id) && w.type === "tab" && w.parentId)
+      .map((w) => w.parentId!));
+    for (const parentId of tabsParents) {
+      const siblings = screen.widgets.filter((w) => w.type === "tab" && w.parentId === parentId);
+      const selectedTabs = siblings.filter((w) => rootIds.has(w.id));
+      if (selectedTabs.length >= siblings.length && selectedTabs.length > 0) {
+        const keepId = selectedId && selectedTabs.some((w) => w.id === selectedId) ? selectedId : selectedTabs[0].id;
+        rootIds.delete(keepId);
+      }
     }
     const collectDescendants = (rootId: string, all: WidgetSpec[]): Set<string> => {
       const ids = new Set<string>([rootId]);
@@ -365,10 +399,14 @@ export default function EditorPage() {
       }
       return ids;
     };
-    const toRemove = collectDescendants(id, screen.widgets);
+    const toRemove = new Set<string>();
+    for (const rootId of rootIds) {
+      for (const descendantId of collectDescendants(rootId, screen.widgets)) toRemove.add(descendantId);
+    }
+    if (toRemove.size === 0) return;
     commitScreen({ ...screen, widgets: screen.widgets.filter((w) => !toRemove.has(w.id)) });
-    setSelectedId(null);
-  }, [screen, commitScreen, selectedId]);
+    selectSingleWidget(null);
+  }, [screen, commitScreen, selectedId, selectedIds, selectSingleWidget]);
 
   const addWidget = useCallback((type: string, parentId?: string, atX?: number, atY?: number) => {
     const def = getWidgetDef(type);
@@ -376,29 +414,50 @@ export default function EditorPage() {
     const id = newId(type, screen.widgets);
     const pos = atX !== undefined && atY !== undefined ? { x: atX, y: atY } : {};
     const sizeClamp = computeInitialSize(def.defaultWidget.w, def.defaultWidget.h, parentId, screen.widgets);
-    const widget: WidgetSpec = { ...def.defaultWidget, id, ...sizeClamp, ...pos, ...(parentId ? { parentId } : {}) };
+    const widget = normalizeInventoryAreaSize({ ...def.defaultWidget, id, ...sizeClamp, ...pos, ...(parentId ? { parentId } : {}) });
     const extra: WidgetSpec[] = [];
     if (type === "tabs") {
       const tabDef = getWidgetDef("tab");
       if (tabDef) extra.push({ ...tabDef.defaultWidget, id: newId("tab", [...screen.widgets, widget]), parentId: id });
     }
     commitScreen({ ...screen, widgets: [...screen.widgets, widget, ...extra] });
-    setSelectedId(id);
-  }, [screen, commitScreen]);
+    selectSingleWidget(id);
+  }, [screen, commitScreen, selectSingleWidget]);
 
   const reorderWidget = useCallback((draggedIds: string[], overId: string, placement: "before" | "after" | "inside") => {
     if (draggedIds.length === 0 || draggedIds.includes(overId)) return;
     const widgets = screen.widgets;
-    const draggedSet = new Set(draggedIds);
+    const requestedSet = new Set(draggedIds);
+    // When an ancestor and one of its descendants are both selected, moving
+    // the ancestor already carries the child. Reparenting both would apply the
+    // position change twice and detach the child from its parent.
+    const effectiveDraggedIds = draggedIds.filter((id) => {
+      let parentId = widgets.find((w) => w.id === id)?.parentId;
+      while (parentId) {
+        if (requestedSet.has(parentId)) return false;
+        parentId = widgets.find((w) => w.id === parentId)?.parentId;
+      }
+      return true;
+    });
+    if (effectiveDraggedIds.includes(overId)) return;
+    const draggedSet = new Set(effectiveDraggedIds);
     const over = widgets.find(w => w.id === overId);
     if (!over) return;
+    if (placement === "inside" && !getWidgetDef(over.type)?.isContainer) return;
 
+    const widgetsById = new Map(widgets.map((widget) => [widget.id, widget] as const));
     const absPos = (wid: string): { x: number; y: number } => {
-      const w = widgets.find(v => v.id === wid);
-      if (!w) return { x: 0, y: 0 };
-      if (!w.parentId) return { x: w.x, y: w.y };
-      const parent = absPos(w.parentId);
-      return { x: parent.x + w.x, y: parent.y + w.y };
+      const widget = widgetsById.get(wid);
+      if (!widget) return { x: 0, y: 0 };
+      const parent = widget.parentId ? widgetsById.get(widget.parentId) : undefined;
+      // A tab's own x/y controls its header position; resolveAbsolutePos uses
+      // the tab content origin for its children, so preserve the header coords
+      // when the tab itself is being reordered under its tabs widget.
+      if (widget.type === "tab" && parent?.type === "tabs") {
+        const parentPos = resolveAbsolutePos(parent, widgetsById);
+        return { x: parentPos.x + widget.x, y: parentPos.y + widget.y };
+      }
+      return resolveAbsolutePos(widget, widgetsById);
     };
 
     const newParentId: string | undefined = placement === "inside" ? overId : over.parentId;
@@ -458,33 +517,211 @@ export default function EditorPage() {
     const src = clipboardRef.current;
     if (!src) return;
     const id = newId(src.type, screen.widgets);
-    commitScreen({ ...screen, widgets: [...screen.widgets, { ...src, id, x: src.x + 8, y: src.y + 8 }] });
-    setSelectedId(id);
-  }, [screen, commitScreen]);
+    commitScreen({ ...screen, widgets: [...screen.widgets, normalizeInventoryAreaSize({ ...src, id, x: src.x + 8, y: src.y + 8 })] });
+    selectSingleWidget(id);
+  }, [screen, commitScreen, selectSingleWidget]);
   const duplicateWidget = useCallback(() => {
     if (!selectedWidget) return;
     const id = newId(selectedWidget.type, screen.widgets);
-    commitScreen({ ...screen, widgets: [...screen.widgets, { ...selectedWidget, id, x: selectedWidget.x + 8, y: selectedWidget.y + 8 }] });
-    setSelectedId(id);
-  }, [screen, commitScreen, selectedWidget]);
+    commitScreen({ ...screen, widgets: [...screen.widgets, normalizeInventoryAreaSize({ ...selectedWidget, id, x: selectedWidget.x + 8, y: selectedWidget.y + 8 })] });
+    selectSingleWidget(id);
+  }, [screen, commitScreen, selectedWidget, selectSingleWidget]);
   const nudgeWidget = useCallback((dx: number, dy: number) => {
-    if (!selectedWidget) return;
-    updateWidget({ ...selectedWidget, x: selectedWidget.x + dx, y: selectedWidget.y + dy });
-  }, [selectedWidget, updateWidget]);
+    const ids = new Set(selectedIds.length ? selectedIds : selectedId ? [selectedId] : []);
+    if (ids.size === 0) return;
+    const movedIds = new Set([...ids].filter((id) => {
+      let parentId = screen.widgets.find((w) => w.id === id)?.parentId;
+      while (parentId) {
+        if (ids.has(parentId)) return false;
+        parentId = screen.widgets.find((w) => w.id === parentId)?.parentId;
+      }
+      return true;
+    }));
+    commitScreen({
+      ...screen,
+      widgets: screen.widgets.map((w) => movedIds.has(w.id) ? { ...w, x: w.x + dx, y: w.y + dy } : w),
+    });
+  }, [screen, commitScreen, selectedId, selectedIds]);
+
+  const alignSelection = useCallback((axis: "horizontal" | "vertical") => {
+    const selected = new Set(selectedIds);
+    if (selected.size < 2) return;
+    const widgetsById = new Map(screen.widgets.map((widget) => [widget.id, widget] as const));
+    const roots = [...selected]
+      .map((id) => widgetsById.get(id))
+      .filter((widget): widget is WidgetSpec => {
+        if (!widget) return false;
+        let parentId = widget.parentId;
+        while (parentId) {
+          if (selected.has(parentId)) return false;
+          parentId = widgetsById.get(parentId)?.parentId;
+        }
+        return true;
+      });
+    if (roots.length < 2) return;
+
+    const absolute = (widget: WidgetSpec) => resolveAbsolutePos(widget, widgetsById);
+    const getBounds = (widget: WidgetSpec) => {
+      if (widget.type !== "group") {
+        const pos = absolute(widget);
+        const size = widget.type === "inventory_area" ? getInventoryAreaSize(widget.props) : widget;
+        return { x: pos.x, y: pos.y, w: size.w, h: size.h };
+      }
+
+      const descendants = screen.widgets.filter((candidate) => {
+        let parentId = candidate.parentId;
+        let insideGroup = false;
+        while (parentId) {
+          const parent = widgetsById.get(parentId);
+          if (parent?.hidden) return false;
+          if (parentId === widget.id) { insideGroup = true; break; }
+          parentId = parent?.parentId;
+        }
+        return insideGroup && candidate.type !== "group" && !candidate.hidden;
+      });
+      if (!descendants.length) {
+        const pos = absolute(widget);
+        return { x: pos.x, y: pos.y, w: widget.w, h: widget.h };
+      }
+      const boxes = descendants.map((child) => {
+        const pos = absolute(child);
+        const size = child.type === "inventory_area" ? getInventoryAreaSize(child.props) : child;
+        return { x: pos.x, y: pos.y, right: pos.x + size.w, bottom: pos.y + size.h };
+      });
+      const x = Math.min(...boxes.map((box) => box.x));
+      const y = Math.min(...boxes.map((box) => box.y));
+      return {
+        x,
+        y,
+        w: Math.max(...boxes.map((box) => box.right)) - x,
+        h: Math.max(...boxes.map((box) => box.bottom)) - y,
+      };
+    };
+
+    const anchor = roots.find((widget) => widget.id === selectedId) ?? roots[0];
+    const anchorBounds = getBounds(anchor);
+    const center = axis === "horizontal"
+      ? anchorBounds.x + anchorBounds.w / 2
+      : anchorBounds.y + anchorBounds.h / 2;
+    const offsets = new Map(roots.map((widget) => {
+      const bounds = getBounds(widget);
+      const ownCenter = axis === "horizontal"
+        ? bounds.x + bounds.w / 2
+        : bounds.y + bounds.h / 2;
+      return [widget.id, Math.round(center - ownCenter)] as const;
+    }));
+    commitScreen({
+      ...screen,
+      widgets: screen.widgets.map((widget) => {
+        const offset = offsets.get(widget.id);
+        if (offset === undefined || widget.id === anchor.id) return widget;
+        return axis === "horizontal"
+          ? { ...widget, x: widget.x + offset }
+          : { ...widget, y: widget.y + offset };
+      }),
+    });
+  }, [screen, commitScreen, selectedIds, selectedId]);
+
+  const distributeSelection = useCallback((axis: "horizontal" | "vertical") => {
+    const selected = new Set(selectedIds);
+    if (selected.size < 3) return;
+    const widgetsById = new Map(screen.widgets.map((widget) => [widget.id, widget] as const));
+    const roots = [...selected]
+      .map((id) => widgetsById.get(id))
+      .filter((widget): widget is WidgetSpec => {
+        if (!widget) return false;
+        let parentId = widget.parentId;
+        while (parentId) {
+          if (selected.has(parentId)) return false;
+          parentId = widgetsById.get(parentId)?.parentId;
+        }
+        return true;
+      });
+    if (roots.length < 3) return;
+
+    const getBounds = (widget: WidgetSpec) => {
+      if (widget.type !== "group") {
+        const pos = resolveAbsolutePos(widget, widgetsById);
+        const size = widget.type === "inventory_area" ? getInventoryAreaSize(widget.props) : widget;
+        return { x: pos.x, y: pos.y, w: size.w, h: size.h };
+      }
+
+      const descendants = screen.widgets.filter((candidate) => {
+        let parentId = candidate.parentId;
+        let insideGroup = false;
+        while (parentId) {
+          const parent = widgetsById.get(parentId);
+          if (parent?.hidden) return false;
+          if (parentId === widget.id) { insideGroup = true; break; }
+          parentId = parent?.parentId;
+        }
+        return insideGroup && candidate.type !== "group" && !candidate.hidden;
+      });
+      if (!descendants.length) {
+        const pos = resolveAbsolutePos(widget, widgetsById);
+        return { x: pos.x, y: pos.y, w: widget.w, h: widget.h };
+      }
+      const boxes = descendants.map((child) => {
+        const pos = resolveAbsolutePos(child, widgetsById);
+        const size = child.type === "inventory_area" ? getInventoryAreaSize(child.props) : child;
+        return { x: pos.x, y: pos.y, right: pos.x + size.w, bottom: pos.y + size.h };
+      });
+      const x = Math.min(...boxes.map((box) => box.x));
+      const y = Math.min(...boxes.map((box) => box.y));
+      return {
+        x,
+        y,
+        w: Math.max(...boxes.map((box) => box.right)) - x,
+        h: Math.max(...boxes.map((box) => box.bottom)) - y,
+      };
+    };
+
+    const isHorizontal = axis === "horizontal";
+    const ordered = roots
+      .map((widget, index) => ({ widget, index, bounds: getBounds(widget) }))
+      .sort((a, b) => (isHorizontal ? a.bounds.x - b.bounds.x : a.bounds.y - b.bounds.y) || a.index - b.index);
+    const startOf = (bounds: typeof ordered[number]["bounds"]) => isHorizontal ? bounds.x : bounds.y;
+    const sizeOf = (bounds: typeof ordered[number]["bounds"]) => isHorizontal ? bounds.w : bounds.h;
+    const first = ordered[0];
+    const last = ordered[ordered.length - 1];
+    const span = startOf(last.bounds) + sizeOf(last.bounds) - startOf(first.bounds);
+    const totalSize = ordered.reduce((sum, entry) => sum + sizeOf(entry.bounds), 0);
+    const gap = (span - totalSize) / (ordered.length - 1);
+    const targets = new Map<string, number>();
+    let cursor = startOf(first.bounds) + sizeOf(first.bounds) + gap;
+    for (let index = 1; index < ordered.length - 1; index++) {
+      const entry = ordered[index];
+      const target = Math.round(cursor);
+      if (target !== startOf(entry.bounds)) targets.set(entry.widget.id, target);
+      cursor += sizeOf(entry.bounds) + gap;
+    }
+
+    if (targets.size === 0) return;
+    commitScreen({
+      ...screen,
+      widgets: screen.widgets.map((widget) => {
+        const target = targets.get(widget.id);
+        if (target === undefined) return widget;
+        const bounds = getBounds(widget);
+        const delta = target - startOf(bounds);
+        return isHorizontal ? { ...widget, x: widget.x + delta } : { ...widget, y: widget.y + delta };
+      }),
+    });
+  }, [screen, commitScreen, selectedIds]);
 
   const addScreen = useCallback(() => {
     const newScreen: ScreenSpec = { id: `screen_${screens.length + 1}`, modId: screen.modId, width: 320, height: 180, widgets: [] };
     commit({ screens: [...screens, newScreen], activeIdx: screens.length });
-    setSelectedId(null);
-  }, [screens, screen.modId, commit]);
+    selectSingleWidget(null);
+  }, [screens, screen.modId, commit, selectSingleWidget]);
 
   const removeScreen = useCallback((idx: number) => {
     if (screens.length <= 1) return;
     const next = screens.filter((_, i) => i !== idx);
     const newActiveIdx = idx < activeIdx ? activeIdx - 1 : idx === activeIdx ? Math.min(activeIdx, next.length - 1) : activeIdx;
     commit({ screens: next, activeIdx: newActiveIdx });
-    setSelectedId(null);
-  }, [screens, activeIdx, commit]);
+    selectSingleWidget(null);
+  }, [screens, activeIdx, commit, selectSingleWidget]);
 
   const renameScreen = useCallback((idx: number, name: string) => {
     commit({ screens: screens.map((s, i) => i === idx ? { ...s, id: name } : s), activeIdx });
@@ -502,8 +739,8 @@ export default function EditorPage() {
 
   const switchScreen = useCallback((idx: number) => {
     setHistory(h => h.map((e, i) => i === cursor ? { ...e, activeIdx: idx } : e));
-    setSelectedId(null);
-  }, [cursor]);
+    selectSingleWidget(null);
+  }, [cursor, selectSingleWidget]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -520,8 +757,8 @@ export default function EditorPage() {
       if (mod && e.key === "v") { e.preventDefault(); pasteWidget(); return; }
       if (mod && e.key === "d") { e.preventDefault(); duplicateWidget(); return; }
       if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteWidget(); return; }
-      if (e.key === "Escape") { if (tryMode) setTryMode(false); else setSelectedId(null); return; }
-      if (e.key === "t" || e.key === "T") { setTryMode((v) => { if (!v) setSelectedId(null); return !v; }); return; }
+      if (e.key === "Escape") { if (tryMode) setTryMode(false); else selectSingleWidget(null); return; }
+      if (e.key === "t" || e.key === "T") { setTryMode((v) => { if (!v) selectSingleWidget(null); return !v; }); return; }
       const step = e.shiftKey ? gridSize : 1;
       if (e.key === "ArrowLeft")  { e.preventDefault(); nudgeWidget(-step, 0); return; }
       if (e.key === "ArrowRight") { e.preventDefault(); nudgeWidget(step, 0);  return; }
@@ -530,7 +767,7 @@ export default function EditorPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [undo, redo, copyWidget, pasteWidget, duplicateWidget, deleteWidget, nudgeWidget, gridSize, tryMode, zoomIn, zoomOut, zoomReset]);
+  }, [undo, redo, copyWidget, pasteWidget, duplicateWidget, deleteWidget, nudgeWidget, gridSize, tryMode, zoomIn, zoomOut, zoomReset, selectSingleWidget]);
 
   const handleExportScreen = useCallback((idx: number) => {
     try {
@@ -574,7 +811,7 @@ export default function EditorPage() {
         while (existingIds.has(id)) id = `${parsed.id}_${suffix++}`;
         const newScreen: ScreenSpec = { ...parsed, id };
         commit({ screens: [...screens, newScreen], activeIdx: screens.length });
-        setSelectedId(null);
+        selectSingleWidget(null);
       } catch {
         alert("Failed to parse ScreenSpec JSON.");
       }
@@ -617,20 +854,47 @@ export default function EditorPage() {
 
     setExportingPng(true);
     try {
-      const blob = await exportWidgetPng(widgetElement, selectedWidget.w, selectedWidget.h);
+      // Groups auto-size from their children and may have leading empty space.
+      // Crop to the visible descendants so the exported design starts at the
+      // first child instead of preserving the group's internal offset.
+      const renderedBounds = widgetElement.getBoundingClientRect();
+      let exportWidth = selectedWidget.type === "group"
+        ? Math.max(1, Math.round(renderedBounds.width / scale))
+        : selectedWidget.w;
+      let exportHeight = selectedWidget.type === "group"
+        ? Math.max(1, Math.round(renderedBounds.height / scale))
+        : selectedWidget.h;
+      let cropLeft = 0;
+      let cropTop = 0;
+      if (selectedWidget.type === "group") {
+        const descendants = [...widgetElement.querySelectorAll<HTMLElement>("[data-widget-id]")]
+          .filter((node) => screen.widgets.find((widget) => widget.id === node.dataset.widgetId)?.type !== "group");
+        if (descendants.length > 0) {
+          const bounds = descendants.map((node) => node.getBoundingClientRect());
+          const left = Math.min(...bounds.map((box) => box.left));
+          const top = Math.min(...bounds.map((box) => box.top));
+          const right = Math.max(...bounds.map((box) => box.right));
+          const bottom = Math.max(...bounds.map((box) => box.bottom));
+          cropLeft = Math.floor((left - renderedBounds.left) / scale);
+          cropTop = Math.floor((top - renderedBounds.top) / scale);
+          exportWidth = Math.max(1, Math.ceil((right - left) / scale));
+          exportHeight = Math.max(1, Math.ceil((bottom - top) / scale));
+        }
+      }
+      const blob = await exportWidgetPng(widgetElement, exportWidth, exportHeight, cropLeft, cropTop);
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
       link.download = `${selectedWidget.id}.png`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast.success(`Exported ${selectedWidget.id}.png (${selectedWidget.w} × ${selectedWidget.h}px)`);
+      toast.success(`Exported ${selectedWidget.id}.png (${exportWidth} × ${exportHeight}px)`);
     } catch (error) {
       toast.error(`Could not export PNG: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setExportingPng(false);
     }
-  }, [selectedWidget]);
+  }, [selectedWidget, scale, screen.widgets]);
 
   const handleImportProjectClick = () => importProjectRef.current?.click();
   const handleImportProjectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -648,7 +912,7 @@ export default function EditorPage() {
           if (!s.id || !Array.isArray(s.widgets)) throw new Error("Invalid ScreenSpec in project");
         }
         commit({ screens: importedScreens, activeIdx: 0 });
-        setSelectedId(null);
+        selectSingleWidget(null);
       } catch {
         alert("Failed to parse project JSON.");
       }
@@ -732,7 +996,7 @@ export default function EditorPage() {
             onToggleGrid={() => setShowGrid((v) => !v)}
             onToggleSnapToParent={() => setSnapToParent((v) => !v)}
             onToggleSnapToSiblings={() => setSnapToSiblings((v) => !v)}
-            onToggleTryMode={() => { setTryMode((v) => { if (!v) setSelectedId(null); return !v; }); }}
+            onToggleTryMode={() => { setTryMode((v) => { if (!v) selectSingleWidget(null); return !v; }); }}
             onScreenChange={(patch) => commitScreen({ ...screen, ...patch })}
             onExportProject={handleExportProject}
             onImportProject={handleImportProjectClick}
@@ -761,7 +1025,7 @@ export default function EditorPage() {
               onMouseDown={(e) => {
                 if (e.target !== e.currentTarget) return; // only the wrapper background, not canvas
                 if (document.activeElement instanceof HTMLInputElement) document.activeElement.blur();
-                setSelectedId(null);
+                selectSingleWidget(null);
               }}
             >
               <div style={{ transform: `translate(${panX}px, ${panY}px)`, margin: "auto", flexShrink: 0 }}>
@@ -778,11 +1042,12 @@ export default function EditorPage() {
                 snapToSiblings={snapToSiblings}
                 tryMode={tryMode}
                 onSelect={setSelectedId}
+                onSelectSingle={selectSingleWidget}
                 onToggleSelect={toggleSelectWidget}
                 onUpdateWidget={updateWidget}
                 onUpdateWidgets={(updated) => {
                   const updatedIds = new Set(updated.map(w => w.id));
-                  const merged = screen.widgets.map(w => updatedIds.has(w.id) ? updated.find(u => u.id === w.id)! : w);
+                  const merged = screen.widgets.map(w => updatedIds.has(w.id) ? normalizeInventoryAreaSize(updated.find(u => u.id === w.id)!) : w);
                   commitScreen({ ...screen, widgets: merged });
                 }}
                 bindingsSchema={screen.bindingsSchema ?? {}}
@@ -795,7 +1060,12 @@ export default function EditorPage() {
               <aside className="w-64 shrink-0 border-l bg-background overflow-y-auto">
                 <PropertyPanel
                   widget={selectedWidget}
+                  selectionCount={selectedIds.length}
+                  onClearSelection={() => selectSingleWidget(null)}
+                  onAlignSelection={alignSelection}
+                  onDistributeSelection={distributeSelection}
                   onUpdate={updateWidget}
+                  onRenameWidget={renameWidget}
                   bindingsSchema={screen.bindingsSchema ?? {}}
                   actions={screen.actions ?? []}
                   onCreateAction={(name) => {

@@ -162,7 +162,7 @@ public final class ScrollableSlotArea {
     /** A slot for {@code dataIndex}, or an inert off-screen one past the container's real size (e.g. a partial last line). */
     private Slot slotFor(int dataIndex, int col, int row, int size) {
         if (dataIndex < size) {
-            return new Slot(container, dataIndex, area.slotX(col), area.slotY(row));
+            return SpecSlots.createSlot(area, container, dataIndex, col, row);
         }
         return new Slot(container, Math.max(0, size - 1), OFFSCREEN, OFFSCREEN);
     }

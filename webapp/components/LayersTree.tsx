@@ -22,6 +22,7 @@ import WIDGET_REGISTRY from "@/lib/widgetRegistry";
 import { WIDGET_ICONS, AddWidgetItems } from "@/components/AddWidgetItems";
 import type { WidgetSpec } from "@/lib/types";
 import { useLocale } from "@/lib/i18n";
+import { MULTI_SELECTION_BACKGROUND, MULTI_SELECTION_COLOR } from "@/lib/selectionStyle";
 
 // ── constants ──────────────────────────────────────────────────────────────────
 
@@ -48,7 +49,10 @@ type DragOverState = { overId: string; placement: Placement } | null;
 function computePlacement(pointerY: number, over: NonNullable<DragEndEvent["over"]>, isContainer: boolean): Placement {
   const { top, height } = over.rect;
   const pct = (pointerY - top) / height;
-  if (isContainer && pct > 0.25 && pct < 0.75) return "inside";
+  // Container rows are short, so reserving only the middle half makes them
+  // difficult targets when nesting a group. Keep a narrow before/after edge
+  // and use most of the row as the inside drop target.
+  if (isContainer && pct > 0.15 && pct < 0.85) return "inside";
   return pct < 0.5 ? "before" : "after";
 }
 
@@ -139,6 +143,12 @@ export default function LayersTree({
 
   const flatItems = flattenTree(widgets, expanded);
   const sortedIds = flatItems.map(f => f.id);
+  const selectedWidget = widgets.find((widget) => widget.id === selectedId);
+
+  useEffect(() => {
+    if (!selectedWidget || !CONTAINER_TYPES.has(selectedWidget.type)) return;
+    setExpanded((prev) => prev.has(selectedWidget.id) ? prev : new Set([...prev, selectedWidget.id]));
+  }, [selectedWidget?.id, selectedWidget?.type]);
 
   const handleDragStart = (e: DragStartEvent) => {
     setDraggingId(String(e.active.id));
@@ -307,8 +317,11 @@ function TreeNode({
             className={`${isDragging ? "cursor-grabbing" : "cursor-default"} pr-24`}
             style={{
               paddingLeft: BASE_PL + depth * INDENT,
-              ...(isMultiSelected && widget.id !== selectedId ? { background: "hsl(217 91% 60% / 0.15)" } : {}),
-              ...(insideHighlight ? { outline: "2px solid hsl(217 91% 60%)", outlineOffset: "-2px", borderRadius: "4px" } : {}),
+              // Keep the primary item and the rest of a multi-selection visually
+              // identical; SidebarMenuButton's default active gray is confusing
+              // beside the blue multi-select rows.
+              ...(widget.id === selectedId || isMultiSelected ? { background: MULTI_SELECTION_BACKGROUND } : {}),
+              ...(insideHighlight ? { outline: `2px solid ${MULTI_SELECTION_COLOR}`, outlineOffset: "-2px", borderRadius: "4px" } : {}),
             }}
             {...attributes}
             {...listeners}

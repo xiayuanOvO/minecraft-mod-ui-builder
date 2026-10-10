@@ -461,6 +461,87 @@ final class SpecWidgetRenderer {
         }
     }
 
+    /** Draws a vanilla survival HUD meter (health, hunger, armor, air, or experience). */
+    void renderSurvivalBar(DrawContext ctx, WidgetSpec w, int x, int y) {
+        double max = Math.max(1.0, w.propDouble("max", 20.0));
+        double value = Math.max(0.0, Math.min(max, resolveValue(w, w.propDouble("value", 0.0))));
+        double fraction = value / max;
+        String kind = w.type;
+
+        if ("experience_bar".equals(kind)) {
+            Identifier background = hudTexture("experience_bar_background.png");
+            Identifier progress = hudTexture("experience_bar_progress.png");
+            ctx.blitIcon(background, x, y, w.w, w.h);
+            int filled = Math.round((float) (w.w * fraction));
+            if (filled > 0) {
+                int sourceW = Math.max(1, Math.min(182, Math.round((float) (182 * fraction))));
+                ctx.blitRegion(progress, x, y, 0, 0, filled, w.h, sourceW, 5, 182, 5);
+            }
+            return;
+        }
+
+        String emptySprite;
+        String fullSprite;
+        String halfSprite;
+        switch (kind) {
+            case "health_bar" -> {
+                emptySprite = "heart/container.png";
+                fullSprite = "heart/full.png";
+                halfSprite = "heart/half.png";
+            }
+            case "hunger_bar" -> {
+                emptySprite = "food_empty.png";
+                fullSprite = "food_full.png";
+                halfSprite = "food_half.png";
+            }
+            case "armor_bar" -> {
+                emptySprite = "armor_empty.png";
+                fullSprite = "armor_full.png";
+                halfSprite = "armor_half.png";
+            }
+            case "air_bar" -> {
+                emptySprite = "air_empty.png";
+                fullSprite = "air.png";
+                halfSprite = "air.png";
+            }
+            default -> { return; }
+        }
+
+        int count = "air_bar".equals(kind)
+            ? Math.max(1, Math.min(20, w.propInt("count", 10)))
+            : Math.max(1, Math.min(20, (int) Math.ceil(max / 2.0)));
+        float iconScale = Math.min(w.w / (float) (count * 8 + 1), w.h / 9.0f);
+        if (iconScale <= 0) return;
+        int iconSize = Math.max(1, Math.round(9 * iconScale));
+        int step = Math.max(1, Math.round(8 * iconScale));
+        int contentW = (count - 1) * step + iconSize;
+        int contentH = iconSize;
+        int startX = x + (w.w - contentW) / 2;
+        int startY = y + (w.h - contentH) / 2;
+        Identifier empty = hudTexture(emptySprite);
+        Identifier full = hudTexture(fullSprite);
+        Identifier half = hudTexture(halfSprite);
+        double unit = "air_bar".equals(kind) ? max / count : 2.0;
+        for (int index = 0; index < count; index++) {
+            int iconX = startX + index * step;
+            ctx.blitIcon(empty, iconX, startY, iconSize, iconSize);
+            double remaining = value - index * unit;
+            if ("air_bar".equals(kind)) {
+                if (remaining >= unit) ctx.blitIcon(full, iconX, startY, iconSize, iconSize);
+            } else if (remaining >= 2.0) {
+                ctx.blitIcon(full, iconX, startY, iconSize, iconSize);
+            } else if (remaining >= 1.0) {
+                ctx.blitIcon(half, iconX, startY, iconSize, iconSize);
+            }
+        }
+    }
+
+    private Identifier hudTexture(String file) {
+        String key = "hud:" + file;
+        return spriteTexCache.computeIfAbsent(key,
+            ignored -> Identifier.withDefaultNamespace("textures/gui/sprites/hud/" + file));
+    }
+
     private static final int CUSTOM_PLACEHOLDER_BG = 0xFF2B2B2B;
     private static final int CUSTOM_PLACEHOLDER_BORDER = 0xFF8B8B8B;
 

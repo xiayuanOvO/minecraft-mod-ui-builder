@@ -13,3 +13,8 @@
 
 # vercel
 .vercel
+
+
+# other
+node_modules/
+26.3

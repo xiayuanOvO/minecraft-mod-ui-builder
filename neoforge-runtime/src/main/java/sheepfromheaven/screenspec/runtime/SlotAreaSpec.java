@@ -1,5 +1,9 @@
 package sheepfromheaven.screenspec.runtime;
 
+import net.minecraft.resources.Identifier;
+
+import java.util.Map;
+
 /**
  * One rectangular grid of inventory slots within a {@link ContainerSpec}, exported by the MC Screen
  * Designer web tool (see {@code lib/types.ts}). Field names and JSON shape must stay in sync with
@@ -32,6 +36,17 @@ public final class SlotAreaSpec {
     public String source;
     public int viewport_rows = 1;
     public String axis = "y";
+    /** Vanilla empty-slot hints keyed by row-major visible cell index. */
+    public Map<Integer, String> slot_hints = Map.of();
+
+    public Identifier slotHint(int col, int row) {
+        String hint = slot_hints == null ? null : slot_hints.get(row * cols + col);
+        if (hint == null) return null;
+        return switch (hint) {
+            case "helmet", "chestplate", "leggings", "boots", "shield" -> Identifier.withDefaultNamespace("container/slot/" + hint);
+            default -> null;
+        };
+    }
 
     public int slotX(int col) {
         return x + col * slot_size + 1;

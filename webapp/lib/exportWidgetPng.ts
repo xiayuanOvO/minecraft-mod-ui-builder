@@ -57,7 +57,13 @@ function svgDataUrl(svg: string): string {
 }
 
 /** Rasterizes one selected widget at its native Minecraft-pixel size. */
-export async function exportWidgetPng(element: HTMLElement, width: number, height: number): Promise<Blob> {
+export async function exportWidgetPng(
+  element: HTMLElement,
+  width: number,
+  height: number,
+  cropLeft = 0,
+  cropTop = 0,
+): Promise<Blob> {
   const bounds = element.getBoundingClientRect();
   if (!bounds.width || !bounds.height || !width || !height) throw new Error("The widget has no size to export.");
 
@@ -71,9 +77,11 @@ export async function exportWidgetPng(element: HTMLElement, width: number, heigh
   // A widget normally sits at its screen position inside the editor canvas.
   // Move its cloned root to the export origin while preserving descendant
   // positions, so the PNG contains only this widget and its nested contents.
+  // A group may have empty space before its first child; negative root offsets
+  // crop that leading space without rewriting each descendant's coordinates.
   clone.style.position = "relative";
-  clone.style.left = "0";
-  clone.style.top = "0";
+  clone.style.left = `${-cropLeft}px`;
+  clone.style.top = `${-cropTop}px`;
   clone.style.right = "auto";
   clone.style.bottom = "auto";
   clone.style.transform = "none";

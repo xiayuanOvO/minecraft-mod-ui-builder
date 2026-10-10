@@ -36,6 +36,8 @@ export interface SlotAreaSpec {
    * hand-editing exported JSON, or by mod code building a ScreenSpec programmatically.
    */
   axis?: "x" | "y";
+  /** Vanilla empty-slot hint sprites keyed by row-major visible cell index. */
+  slot_hints?: Record<number, "helmet" | "chestplate" | "leggings" | "boots" | "shield">;
 }
 
 export interface ContainerSpec {

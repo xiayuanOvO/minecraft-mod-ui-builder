@@ -3,7 +3,7 @@
 import {
   Square, MousePointerClick, ToggleLeft, TextCursorInput,
   SlidersHorizontal, Type, Image, List, ScrollText, Folder, HelpCircle,
-  PanelTop, RectangleHorizontal, Gauge, Puzzle, UserRound,
+  PanelTop, RectangleHorizontal, Gauge, Puzzle, UserRound, Heart, Drumstick, Shield, Wind,
 } from "lucide-react";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import WIDGET_REGISTRY from "@/lib/widgetRegistry";
@@ -25,6 +25,11 @@ export const WIDGET_ICONS: Record<string, React.ElementType> = {
   tab:           RectangleHorizontal,
   custom:        Puzzle,
   player_preview: UserRound,
+  health_bar: Heart,
+  hunger_bar: Drumstick,
+  armor_bar: Shield,
+  air_bar: Wind,
+  experience_bar: Gauge,
 };
 
 export function AddWidgetItems({ onAdd }: { onAdd: (type: string) => void }) {

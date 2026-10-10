@@ -74,6 +74,32 @@ export function computeDragBounds(
 ): { maxX: number; maxY: number } {
   if (target.parentId) {
     const parent = allWidgets.find(w => w.id === target.parentId);
+    // Groups are invisible auto-sizing wrappers, so their stored w/h can be
+    // stale and must not constrain a selected child. Resolve the nearest real
+    // container (or canvas) and account for each group's local offset instead.
+    if (parent?.type === "group") {
+      let offsetX = 0;
+      let offsetY = 0;
+      let ancestor: WidgetSpec | undefined = parent;
+      while (ancestor?.type === "group") {
+        offsetX += ancestor.x;
+        offsetY += ancestor.y;
+        const parentId: string | undefined = ancestor.parentId;
+        ancestor = parentId ? allWidgets.find(w => w.id === parentId) : undefined;
+      }
+      if (ancestor?.type === "tab" && ancestor.parentId) {
+        const tabsId = ancestor.parentId;
+        const tabs = allWidgets.find(w => w.id === tabsId);
+        if (tabs) {
+          const { w, h } = tabContentArea(tabs);
+          return { maxX: w - offsetX - target.w, maxY: h - offsetY - target.h };
+        }
+      }
+      if (ancestor) {
+        return { maxX: ancestor.w - offsetX - target.w, maxY: ancestor.h - offsetY - target.h };
+      }
+      return { maxX: canvasW - offsetX - target.w, maxY: canvasH - offsetY - target.h };
+    }
     if (parent?.type === "tab" && parent.parentId) {
       const tabs = allWidgets.find(w => w.id === parent.parentId);
       if (tabs) {
@@ -97,6 +123,9 @@ export function computeResizeBounds(
   if (!widget.parentId) return null;
   const parent = allWidgets.find(w => w.id === widget.parentId);
   if (!parent) return null;
+  // The group automatically grows around its children; its saved dimensions
+  // aren't a meaningful resize boundary.
+  if (parent.type === "group") return null;
   if (parent.type === "tab" && parent.parentId) {
     const tabs = allWidgets.find(w => w.id === parent.parentId);
     if (tabs) {

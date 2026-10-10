@@ -1,3 +1,1 @@
-# Minecraft textures are Mojang's copyrighted assets — never commit them.
-# They are extracted at runtime from an uploaded resource pack / JAR.
-*.png
+# Bundled Minecraft textures live here so local and deployed builds use the same assets.

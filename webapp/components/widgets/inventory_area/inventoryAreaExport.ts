@@ -1,5 +1,7 @@
 import type { ContainerSpec, WidgetSpec } from "@/lib/types";
+import { getInventoryAreaMetrics } from "@/lib/inventoryAreaSize";
 import { tabChildOrigin } from "../tabs/tabsExport";
+import { parseSlotHints } from "@/lib/slotHints";
 
 /**
  * Resolves a widget's absolute (screen-space) position by walking up its
@@ -40,16 +42,20 @@ export function buildContainerSpec(widgets: WidgetSpec[]): ContainerSpec | undef
   const byId = new Map(widgets.map((w) => [w.id, w]));
   return {
     slots: inventoryWidgets.map((w) => {
-      const slotSize = parseInt(w.props.slot_size ?? "18", 10);
+      const { cols, rows, slotSize } = getInventoryAreaMetrics(w.props);
       const abs = resolveAbsolutePos(w, byId);
+      const slotHints = parseSlotHints(w.props.slot_hints);
       return {
         id:            w.id,
         x:             abs.x,
         y:             abs.y,
-        cols:          parseInt(w.props.cols ?? "1", 10),
+        cols,
         slot_size:     slotSize,
-        viewport_rows: Math.max(1, Math.floor(w.h / slotSize)),
+        viewport_rows: rows,
         ...(w.props.source ? { source: w.props.source as "player" | "player_hotbar" } : {}),
+        ...(Object.keys(slotHints).length
+          ? { slot_hints: slotHints }
+          : {}),
       };
     }),
   };

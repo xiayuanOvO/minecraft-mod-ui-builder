@@ -15,8 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { AlignLeft, AlignCenter, AlignRight } from "lucide-react";
+import { AlignCenter, AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter, AlignHorizontalSpaceBetween, AlignVerticalSpaceBetween, AlignLeft, AlignRight } from "lucide-react";
 import { useLocale } from "@/lib/i18n";
+import { getInventoryAreaSize } from "@/lib/inventoryAreaSize";
+import { SLOT_HINTS, parseSlotHints, serializeSlotHints, slotHintTextureName, type SlotHint } from "@/lib/slotHints";
 
 const BINDING_TARGETS: Record<string, string[]> = {
   button:        ["text", "enabled", "visible"],
@@ -28,6 +30,11 @@ const BINDING_TARGETS: Record<string, string[]> = {
   panel:         ["visible"],
   progress:      ["value", "visible"],
   requirement:   ["satisfied", "visible"],
+  health_bar:    ["value", "visible"],
+  hunger_bar:    ["value", "visible"],
+  armor_bar:     ["value", "visible"],
+  air_bar:       ["value", "visible"],
+  experience_bar:["value", "visible"],
 };
 
 const BINDING_TARGET_TYPES: Record<string, BindingType> = {
@@ -53,12 +60,18 @@ interface Props {
   actions: string[];
   onCreateAction?: (name: string) => void;
   inventoryAreaIds?: string[];
+  selectionCount?: number;
+  onClearSelection?: () => void;
+  onAlignSelection?: (axis: "horizontal" | "vertical") => void;
+  onDistributeSelection?: (axis: "horizontal" | "vertical") => void;
+  onRenameWidget?: (id: string, name: string) => void;
 }
 
-export default function PropertyPanel({ widget, onUpdate, bindingsSchema, actions, onCreateAction, inventoryAreaIds = [] }: Props) {
+export default function PropertyPanel({ widget, onUpdate, bindingsSchema, actions, onCreateAction, inventoryAreaIds = [], selectionCount = 1, onClearSelection, onAlignSelection, onDistributeSelection, onRenameWidget }: Props) {
   const { t } = useLocale();
-  const { packTextures } = useTextures();
+  const { textures, packTextures } = useTextures();
   const [texPickerOpen, setTexPickerOpen] = useState(false);
+  const [selectedHint, setSelectedHint] = useState<{ widgetId: string; index: number } | null>(null);
   if (!widget) {
     return (
       <div className="flex flex-col gap-2 p-3 text-xs text-muted-foreground italic">
@@ -68,9 +81,26 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
   }
 
   const def = getWidgetDef(widget.type);
+  const inventoryAreaSize = widget.type === "inventory_area" ? getInventoryAreaSize(widget.props) : null;
+  const slotHints = widget.type === "inventory_area" ? parseSlotHints(widget.props.slot_hints) : {};
 
   const set = (patch: Partial<WidgetSpec>) => onUpdate({ ...widget, ...patch });
-  const setProp = (key: string, value: string) => onUpdate({ ...widget, props: { ...widget.props, [key]: value } });
+  const setProp = (key: string, value: string) => {
+    let nextValue = value;
+    if (widget.type === "inventory_area" && ["cols", "rows", "slot_size"].includes(key)) {
+      const parsed = Number.parseInt(value, 10);
+      if (!Number.isFinite(parsed)) return;
+      nextValue = String(Math.max(1, parsed));
+    }
+    const props = { ...widget.props, [key]: nextValue };
+    onUpdate({ ...widget, props, ...(widget.type === "inventory_area" ? getInventoryAreaSize(props) : {}) });
+  };
+  const setSlotHint = (index: number, hint: string) => {
+    const next = { ...slotHints };
+    if (SLOT_HINTS.includes(hint as SlotHint)) next[index] = hint as SlotHint;
+    else delete next[index];
+    setProp("slot_hints", serializeSlotHints(next));
+  };
 
   const bindings = widget.bindings ?? {};
   const setBinding = (target: string, providerId: string) =>
@@ -101,12 +131,69 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
   return (
     <div className="flex flex-col gap-1 p-2 text-xs overflow-y-auto">
       <div className="font-bold text-foreground mb-1 uppercase tracking-wide">{t(def?.label ?? widget.type)}</div>
+      {selectionCount > 1 && (
+        <div className="mb-1 rounded-md border bg-muted/40 p-2">
+          <div className="font-semibold">{selectionCount} {t("widgets selected")}</div>
+          <div className="mt-0.5 text-muted-foreground">{t("Properties apply to the primary selection.")}</div>
+          <div className="mt-2 grid grid-cols-2 gap-1">
+            <button
+              type="button"
+              className="flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded border bg-background px-1 text-[11px] hover:bg-accent"
+              title={t("Horizontal center")}
+              aria-label={t("Horizontal center")}
+              onClick={() => onAlignSelection?.("horizontal")}
+            >
+              <AlignHorizontalJustifyCenter className="h-3.5 w-3.5 shrink-0" />
+              <span>{t("Horizontal center")}</span>
+            </button>
+            <button
+              type="button"
+              className="flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded border bg-background px-1 text-[11px] hover:bg-accent"
+              title={t("Vertical center")}
+              aria-label={t("Vertical center")}
+              onClick={() => onAlignSelection?.("vertical")}
+            >
+              <AlignVerticalJustifyCenter className="h-3.5 w-3.5 shrink-0" />
+              <span>{t("Vertical center")}</span>
+            </button>
+            <button
+              type="button"
+              className="flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded border bg-background px-1 text-[11px] hover:bg-accent disabled:pointer-events-none disabled:opacity-40"
+              title={t("Distribute horizontally")}
+              aria-label={t("Distribute horizontally")}
+              disabled={selectionCount < 3}
+              onClick={() => onDistributeSelection?.("horizontal")}
+            >
+              <AlignHorizontalSpaceBetween className="h-3.5 w-3.5 shrink-0" />
+              <span>{t("Distribute horizontally")}</span>
+            </button>
+            <button
+              type="button"
+              className="flex h-7 items-center justify-center gap-1 whitespace-nowrap rounded border bg-background px-1 text-[11px] hover:bg-accent disabled:pointer-events-none disabled:opacity-40"
+              title={t("Distribute vertically")}
+              aria-label={t("Distribute vertically")}
+              disabled={selectionCount < 3}
+              onClick={() => onDistributeSelection?.("vertical")}
+            >
+              <AlignVerticalSpaceBetween className="h-3.5 w-3.5 shrink-0" />
+              <span>{t("Distribute vertically")}</span>
+            </button>
+          </div>
+          <button
+            type="button"
+            className="mt-1 text-primary hover:underline"
+            onClick={onClearSelection}
+          >
+            {t("Clear selection")}
+          </button>
+        </div>
+      )}
 
       <Field label="ID">
         <Input
           className="h-6 text-xs px-1.5"
           value={widget.id}
-          onChange={(e) => set({ id: e.target.value })}
+          onChange={(e) => onRenameWidget ? onRenameWidget(widget.id, e.target.value) : set({ id: e.target.value })}
         />
       </Field>
 
@@ -114,11 +201,20 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
         <div className="grid grid-cols-2 gap-1">
           <Field label="X"><NumInput value={widget.x} onChange={(v) => set({ x: v })} /></Field>
           <Field label="Y"><NumInput value={widget.y} onChange={(v) => set({ y: v })} /></Field>
-          {!(widget.type === "scrollbar" && (widget.props.axis ?? "y") === "y") && (
-            <Field label="W"><NumInput value={widget.w} onChange={(v) => set({ w: v })} /></Field>
-          )}
-          {!(widget.type === "scrollbar" && widget.props.axis === "x") && (
-            <Field label="H"><NumInput value={widget.h} onChange={(v) => set({ h: v })} /></Field>
+          {widget.type === "inventory_area" ? (
+            <>
+              <Field label="W"><Input className="h-6 text-xs px-1.5" type="number" value={inventoryAreaSize?.w ?? widget.w} readOnly /></Field>
+              <Field label="H"><Input className="h-6 text-xs px-1.5" type="number" value={inventoryAreaSize?.h ?? widget.h} readOnly /></Field>
+            </>
+          ) : (
+            <>
+              {!(widget.type === "scrollbar" && (widget.props.axis ?? "y") === "y") && (
+                <Field label="W"><NumInput value={widget.w} onChange={(v) => set({ w: v })} /></Field>
+              )}
+              {!(widget.type === "scrollbar" && widget.props.axis === "x") && (
+                <Field label="H"><NumInput value={widget.h} onChange={(v) => set({ h: v })} /></Field>
+              )}
+            </>
           )}
         </div>
       )}
@@ -362,6 +458,7 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
                   <Input
                     className="h-6 text-xs px-1.5"
                     type={field.type === "number" ? "number" : "text"}
+                    min={widget.type === "inventory_area" && field.type === "number" ? 1 : undefined}
                     value={currentValue}
                     onChange={(e) => setProp(field.key, e.target.value)}
                   />
@@ -371,6 +468,58 @@ export default function PropertyPanel({ widget, onUpdate, bindingsSchema, action
           })()}
         </>
       )}
+
+      {widget.type === "inventory_area" && (() => {
+        const cols = Number.parseInt(widget.props.cols ?? "9", 10) || 9;
+        const rows = Number.parseInt(widget.props.rows ?? "3", 10) || 3;
+        const count = cols * rows;
+        const activeIndex = Math.min(selectedHint?.widgetId === widget.id ? selectedHint.index : 0, count - 1);
+        const activeHint = slotHints[activeIndex];
+        const textureMap = textures as Record<string, string | undefined>;
+        const tileTexture = textureMap["mc_slot_tile.png"];
+        return (
+          <div className="mt-1 flex flex-col gap-1.5">
+            <Field label={t("Slot hint")}>
+              <PropSelect
+                value={activeHint ?? ""}
+                options={["", ...SLOT_HINTS]}
+                labels={{ "": t("None") }}
+                onChange={(value) => setSlotHint(activeIndex, value)}
+              />
+            </Field>
+            <div className="max-h-36 overflow-auto rounded border bg-muted/30 p-1">
+              <div className="grid w-max gap-0.5" style={{ gridTemplateColumns: `repeat(${cols}, 20px)` }}>
+                {Array.from({ length: count }, (_, index) => {
+                  const hint = slotHints[index];
+                  const hintTexture = hint ? textureMap[slotHintTextureName(hint)] : undefined;
+                  return (
+                    <button
+                      key={index}
+                      type="button"
+                      aria-label={`${t("Slot")} ${index + 1}${hint ? `: ${t(hint)}` : ""}`}
+                      title={`${t("Slot")} ${index + 1}${hint ? `: ${t(hint)}` : ""}`}
+                      onClick={() => setSelectedHint({ widgetId: widget.id, index })}
+                      className={`relative flex size-5 items-center justify-center rounded-sm ${
+                        activeIndex === index ? "ring-2 ring-primary ring-offset-1" : "hover:ring-1 hover:ring-primary/60"
+                      }`}
+                      style={{
+                        backgroundColor: "#8b8b8b",
+                        backgroundImage: tileTexture ? `url("${tileTexture}")` : undefined,
+                        backgroundSize: "20px 20px",
+                        imageRendering: "pixelated",
+                      }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {hintTexture && <img src={hintTexture} alt="" draggable={false} className="pointer-events-none size-4" style={{ imageRendering: "pixelated" }} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="text-[10px] text-muted-foreground">{t("Select a slot, then choose its hint.")}</div>
+          </div>
+        );
+      })()}
 
       {widget.type !== "group" && (
         <Field label={t("Action")}>

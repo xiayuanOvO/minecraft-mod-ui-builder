@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { clearTextures, loadAllTextures, saveTexture } from "./textureStore";
 import { extractFromPack, type ExtractResult } from "./extractFromPack";
-import { extractFromGithub, fetchGithubPackCatalog } from "./extractFromGithub";
+import { extractFromLocal, extractSlotHintTexturesFromLocal, fetchLocalTextureCatalog } from "./extractFromLocal";
 
 export const REQUIRED_TEXTURES = [
   "mc_panel_slice.png",
@@ -27,7 +27,16 @@ export const REQUIRED_TEXTURES = [
   "widget_tab_unselected.png",
 ] as const;
 
-export type TextureName = (typeof REQUIRED_TEXTURES)[number];
+export const OPTIONAL_TEXTURES = [
+  "mc_slot_hint_helmet.png",
+  "mc_slot_hint_chestplate.png",
+  "mc_slot_hint_leggings.png",
+  "mc_slot_hint_boots.png",
+  "mc_slot_hint_shield.png",
+] as const;
+
+const ALL_TEXTURES = [...REQUIRED_TEXTURES, ...OPTIONAL_TEXTURES] as const;
+export type TextureName = (typeof ALL_TEXTURES)[number];
 
 interface TextureCtx {
   textures: Partial<Record<TextureName, string>>;
@@ -63,16 +72,16 @@ export function TextureProvider({ children }: { children: React.ReactNode }) {
   const [initialized, setInitialized] = useState(false);
   const [setupRequired, setSetupRequired] = useState(false);
   const urlsRef = useRef<string[]>([]);
-  // Raw GitHub CDN URLs for arbitrary pack textures (sprite/icon widgets),
-  // fetched once and merged under any keys an uploaded pack didn't provide.
-  const githubCatalogRef = useRef<Record<string, string>>({});
+  // Local Minecraft texture URLs for sprite/icon widgets, merged under any
+  // keys an uploaded pack provides.
+  const localCatalogRef = useRef<Record<string, string>>({});
 
   const applyBlobs = (blobs: Record<string, Blob>) => {
     urlsRef.current.forEach((u) => URL.revokeObjectURL(u));
     urlsRef.current = [];
     const next: Partial<Record<TextureName, string>> = {};
-    const pack: Record<string, string> = { ...githubCatalogRef.current };
-    for (const name of REQUIRED_TEXTURES) {
+    const pack: Record<string, string> = { ...localCatalogRef.current };
+    for (const name of ALL_TEXTURES) {
       if (blobs[name]) {
         const url = URL.createObjectURL(blobs[name]);
         urlsRef.current.push(url);
@@ -86,24 +95,20 @@ export function TextureProvider({ children }: { children: React.ReactNode }) {
       if (key.startsWith("pack:")) {
         const url = URL.createObjectURL(blob);
         urlsRef.current.push(url);
-        pack[key.slice(5)] = url; // an uploaded pack's own file wins over the GitHub catalog entry
+        pack[key.slice(5)] = url; // uploaded pack files override bundled texture URLs
       }
     }
     setPackTextures(pack);
   };
 
   /**
-   * Loads textures from IndexedDB; if empty, auto-loads the default
-   * reference pack straight from GitHub's raw CDN (the browser fetches
-   * directly from GitHub — this app never hosts or redistributes those
-   * bytes itself). Only falls back to requiring manual "upload a JAR/pack"
-   * if that fetch didn't fully succeed (offline, GitHub unreachable, etc),
-   * so the app keeps working either way. Shared by the mount effect and reset().
+   * Loads cached textures, then fills missing defaults from the project's
+   * locally bundled Minecraft 26.3 assets. Shared by mount and reset().
    */
-  const loadOrAutoFetch = async () => {
+  const loadOrPrepareLocalTextures = async () => {
     let blobs = await loadAllTextures();
     if (Object.keys(blobs).length === 0) {
-      const result = await extractFromGithub().catch(() => null);
+      const result = await extractFromLocal().catch(() => null);
       blobs = await loadAllTextures();
       const gotAllRequired = result && result.missing.length === 0;
       if (!gotAllRequired || Object.keys(blobs).length === 0) {
@@ -111,6 +116,10 @@ export function TextureProvider({ children }: { children: React.ReactNode }) {
         setInitialized(true);
         return;
       }
+    } else if (OPTIONAL_TEXTURES.some((name) => !blobs[name])) {
+      // Backfill slot hints missing from older local caches.
+      await extractSlotHintTexturesFromLocal().catch(() => {});
+      blobs = await loadAllTextures();
     }
     applyBlobs(blobs);
     setSetupRequired(false);
@@ -118,15 +127,12 @@ export function TextureProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // The GitHub pack catalog (arbitrary item/sprite textures) is
-    // independent of the required-texture pipeline below — fetch it
-    // opportunistically; an empty result just means nothing to browse.
-    fetchGithubPackCatalog().then((catalog) => {
-      githubCatalogRef.current = catalog;
+    fetchLocalTextureCatalog().then((catalog) => {
+      localCatalogRef.current = catalog;
       setPackTextures((prev) => ({ ...catalog, ...prev }));
     });
 
-    loadOrAutoFetch().catch((e) => {
+    loadOrPrepareLocalTextures().catch((e) => {
       console.error(e);
       setSetupRequired(true);
       setInitialized(true);
@@ -138,7 +144,7 @@ export function TextureProvider({ children }: { children: React.ReactNode }) {
   const uploadFiles = async (files: FileList) => {
     const blobs = await loadAllTextures();
     for (const file of Array.from(files)) {
-      if ((REQUIRED_TEXTURES as readonly string[]).includes(file.name)) {
+      if ((ALL_TEXTURES as readonly string[]).includes(file.name)) {
         await saveTexture(file.name, file);
         blobs[file.name] = file;
       }
@@ -165,9 +171,8 @@ export function TextureProvider({ children }: { children: React.ReactNode }) {
     urlsRef.current = [];
     setTextures({});
     setPackTextures({});
-    // Same auto-detect flow as first mount: try the default GitHub-hosted
-    // pack again, only falling back to manual upload if that fails.
-    await loadOrAutoFetch();
+    // Same local asset loading flow as first mount.
+    await loadOrPrepareLocalTextures();
   };
 
   const ready = REQUIRED_TEXTURES.every((n) => !!textures[n]);
